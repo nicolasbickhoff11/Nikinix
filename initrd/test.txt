@@ -1,0 +1,1 @@
+No SIGSEGV so far. I hate SIGSEGVs.
