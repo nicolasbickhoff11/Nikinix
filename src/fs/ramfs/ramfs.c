@@ -3,56 +3,158 @@
 #include "malloc.h"
 #include "string.h"
 #include "print.h"
+#include "errno.h"
 
-int ramfs_lookup(vnode_t *dir, const char *name, vnode_t **result) {
-    if (!dir || !name || !result) return -1;
+
+int ramfs_lookup(
+    vnode_t *dir,
+    const char *name,
+    vnode_t **result
+) {
+    if (!dir || !name || !result)
+        return -EFAULT;
+
     *result = NULL;
 
-    if (!S_ISDIR(dir->mode)) return -2;
+    if (!S_ISDIR(dir->mode))
+        return -ENOTDIR;
 
     ramfs_node_t *node = dir->private;
-    if (!node) return -3;
 
-    for (size_t i = 0; i < node->children_count; i++) {
+    if (!node)
+        return -EIO;
+
+    for (size_t i = 0;
+         i < node->children_count;
+         i++) {
+
         ramfs_node_t *entry = node->children[i];
 
         if (!entry || !entry->name)
             continue;
 
         if (strcmp(name, entry->name) == 0) {
+
             vnode_t *res = malloc(sizeof(vnode_t));
+
             if (!res)
-                return -4;
+                return -ENOMEM;
 
             res->mode = entry->mode;
             res->inode = entry->inode;
             res->mnt = dir->mnt;
             res->private = entry;
 
+            /*
+             * O vnode encontrado pertence ao diretório
+             * que realizou o lookup.
+             */
+            res->parent = dir;
+
             *result = res;
+
             return 0;
         }
     }
 
-    return -5;
+    return -ENOENT;
 }
 
-int ramfs_create(vnode_t *dir, const char *name, uint32_t mode, vnode_t **result) {
-    if (!dir || !name || !result) return -1;
-    *result = NULL;
 
-    if (!S_ISDIR(dir->mode)) return -2;
+ssize_t ramfs_readdir(
+    vnode_t *dir,
+    dirent_t *entries,
+    size_t max_entries
+) {
+    if (!dir || !entries)
+        return -EFAULT;
+
+    if (!S_ISDIR(dir->mode))
+        return -ENOTDIR;
 
     ramfs_node_t *node = dir->private;
-    if (!node) return -3;
 
-    ramfs_node_t *new_entry = malloc(sizeof(ramfs_node_t));
-    if (!new_entry) return -4;
+    if (!node)
+        return -EIO;
+
+    size_t count = 0;
+
+    for (size_t i = 0;
+         i < node->children_count &&
+         count < max_entries;
+         i++) {
+
+        ramfs_node_t *entry = node->children[i];
+
+        if (!entry || !entry->name)
+            continue;
+
+        entries[count].inode = entry->inode;
+        entries[count].type = entry->mode;
+
+        memcpy(
+            entries[count].name,
+            entry->name,
+            sizeof(entries[count].name) - 1
+        );
+
+        entries[count].name[
+            sizeof(entries[count].name) - 1
+        ] = '\0';
+
+        count++;
+    }
+
+    return (ssize_t)count;
+}
+
+
+int ramfs_create(
+    vnode_t *dir,
+    const char *name,
+    uint32_t mode,
+    vnode_t **result
+) {
+    if (!dir || !name || !result)
+        return -EFAULT;
+
+    *result = NULL;
+
+    if (!S_ISDIR(dir->mode))
+        return -ENOTDIR;
+
+    ramfs_node_t *node = dir->private;
+
+    if (!node)
+        return -EIO;
+
+    /*
+     * Evita criar dois objetos com o mesmo nome.
+     */
+    for (size_t i = 0;
+         i < node->children_count;
+         i++) {
+
+        ramfs_node_t *entry = node->children[i];
+
+        if (!entry || !entry->name)
+            continue;
+
+        if (strcmp(name, entry->name) == 0)
+            return -EEXIST;
+    }
+
+    ramfs_node_t *new_entry =
+        malloc(sizeof(ramfs_node_t));
+
+    if (!new_entry)
+        return -ENOMEM;
 
     new_entry->name = strdup(name);
+
     if (!new_entry->name) {
         free(new_entry);
-        return -5;
+        return -ENOMEM;
     }
 
     new_entry->mode = mode;
@@ -66,50 +168,84 @@ int ramfs_create(vnode_t *dir, const char *name, uint32_t mode, vnode_t **result
 
     ramfs_node_t **tmp = realloc(
         node->children,
-        (node->children_count + 1) * sizeof(*node->children)
+        (node->children_count + 1) *
+        sizeof(*node->children)
     );
 
     if (!tmp) {
         free(new_entry->name);
         free(new_entry);
-        return -6;
+        return -ENOMEM;
     }
 
     node->children = tmp;
-    node->children[node->children_count] = new_entry;
+
+    node->children[
+        node->children_count
+    ] = new_entry;
+
     node->children_count++;
 
     vnode_t *res = malloc(sizeof(vnode_t));
+
     if (!res) {
-        return -7;
+        /*
+         * O objeto já foi inserido no diretório.
+         * Por enquanto mantemos a entrada.
+         */
+        return -ENOMEM;
     }
 
     res->mode = new_entry->mode;
     res->inode = new_entry->inode;
     res->mnt = dir->mnt;
     res->private = new_entry;
-    res->parent = dir->parent;
+
+    /*
+     * O pai é o diretório onde o objeto foi criado.
+     */
+    res->parent = dir;
 
     *result = res;
 
     return 0;
 }
 
-int ramfs_remove(vnode_t *dir, const char *name) {
-    if (!dir || !name) return -1;
 
-    if (!S_ISDIR(dir->mode)) return -2;
+int ramfs_remove(
+    vnode_t *dir,
+    const char *name
+) {
+    if (!dir || !name)
+        return -EFAULT;
+
+    if (!S_ISDIR(dir->mode))
+        return -ENOTDIR;
 
     ramfs_node_t *node = dir->private;
-    if (!node) return -3;
 
-    for (size_t i = 0; i < node->children_count; i++) {
+    if (!node)
+        return -EIO;
+
+    for (size_t i = 0;
+         i < node->children_count;
+         i++) {
+
         ramfs_node_t *entry = node->children[i];
 
         if (!entry)
             continue;
 
         if (strcmp(entry->name, name) == 0) {
+
+            /*
+             * Não permite remover diretório
+             * que ainda possui filhos.
+             */
+            if (S_ISDIR(entry->mode) &&
+                entry->children_count > 0)
+                return -EBUSY;
+
             free(entry->data);
             free(entry->name);
             free(entry);
@@ -120,16 +256,26 @@ int ramfs_remove(vnode_t *dir, const char *name) {
         }
     }
 
-    return -4;
+    return -ENOENT;
 }
 
-ssize_t ramfs_read(vnode_t *file, void *buffer, size_t count, uint64_t offset) {
-    if (!file || !buffer) return -1;
+
+ssize_t ramfs_read(
+    vnode_t *file,
+    void *buffer,
+    size_t count,
+    uint64_t offset
+) {
+    if (!file || !buffer)
+        return -EFAULT;
 
     ramfs_node_t *node = file->private;
 
-    if (!node) return -2;
-    if (!S_ISREG(file->mode)) return -3;
+    if (!node)
+        return -EIO;
+
+    if (!S_ISREG(file->mode))
+        return -EINVAL;
 
     if (count == 0)
         return 0;
@@ -137,44 +283,67 @@ ssize_t ramfs_read(vnode_t *file, void *buffer, size_t count, uint64_t offset) {
     if (offset >= node->current_data_size)
         return 0;
 
-    uint64_t size = node->current_data_size - offset;
+    uint64_t size =
+        node->current_data_size - offset;
 
     if (size > count)
         size = count;
 
-    memcpy(buffer, node->data + offset, size);
+    memcpy(
+        buffer,
+        node->data + offset,
+        size
+    );
 
-    return size;
+    return (ssize_t)size;
 }
 
-ssize_t ramfs_write(vnode_t *file, const void *buffer, size_t count, uint64_t offset) {
-    if (!file || !buffer) return -1;
+
+ssize_t ramfs_write(
+    vnode_t *file,
+    const void *buffer,
+    size_t count,
+    uint64_t offset
+) {
+    if (!file || !buffer)
+        return -EFAULT;
 
     ramfs_node_t *node = file->private;
 
-    if (!node) return -2;
-    if (!S_ISREG(file->mode)) return -3;
+    if (!node)
+        return -EIO;
+
+    if (!S_ISREG(file->mode))
+        return -EINVAL;
 
     if (count == 0)
         return 0;
 
+    /*
+     * Verifica overflow de offset + count.
+     */
+    if (offset > UINT64_MAX - count)
+        return -EOVERFLOW;
+
     uint64_t new_size = offset + count;
 
-    if (new_size < offset)
-        return -4;
-
     if (new_size > node->current_data_size) {
-        uint64_t old_size = node->current_data_size;
 
-        void *new_data = realloc(node->data, new_size);
+        uint64_t old_size =
+            node->current_data_size;
+
+        void *new_data =
+            realloc(node->data, new_size);
+
         if (!new_data)
-            return -5;
+            return -ENOMEM;
 
         node->data = new_data;
 
         if (new_size > old_size) {
+
             memset(
-                node->data + old_size,
+                (uint8_t *)node->data + old_size,
                 0,
                 new_size - old_size
             );
@@ -183,25 +352,36 @@ ssize_t ramfs_write(vnode_t *file, const void *buffer, size_t count, uint64_t of
         node->current_data_size = new_size;
     }
 
-    memcpy(node->data + offset, buffer, count);
+    memcpy(
+        (uint8_t *)node->data + offset,
+        buffer,
+        count
+    );
 
-    return count;
+    return (ssize_t)count;
 }
 
+
 node_ops_t ramfs_ops = {
-    .create = ramfs_create,
-    .lookup = ramfs_lookup,
-    .remove = ramfs_remove,
-    .read = ramfs_read,
-    .write = ramfs_write
+    .create  = ramfs_create,
+    .lookup  = ramfs_lookup,
+    .remove  = ramfs_remove,
+    .read    = ramfs_read,
+    .write   = ramfs_write,
+    .readdir = ramfs_readdir
 };
 
-mount_t *create_ramfs(void) {
-    ramfs_node_t *root = malloc(sizeof(ramfs_node_t));
+
+mount_t *create_ramfs(void)
+{
+    ramfs_node_t *root =
+        malloc(sizeof(ramfs_node_t));
+
     if (!root)
         return NULL;
 
     root->name = strdup("/");
+
     if (!root->name) {
         free(root);
         return NULL;
@@ -216,7 +396,9 @@ mount_t *create_ramfs(void) {
     root->parent = NULL;
     root->next = NULL;
 
-    vnode_t *root_vfs = malloc(sizeof(vnode_t));
+    vnode_t *root_vfs =
+        malloc(sizeof(vnode_t));
+
     if (!root_vfs) {
         free(root->name);
         free(root);
@@ -229,7 +411,9 @@ mount_t *create_ramfs(void) {
     root_vfs->private = root;
     root_vfs->parent = NULL;
 
-    mount_t *mount = malloc(sizeof(mount_t));
+    mount_t *mount =
+        malloc(sizeof(mount_t));
+
     if (!mount) {
         free(root_vfs);
         free(root->name);

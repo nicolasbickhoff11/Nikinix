@@ -2,6 +2,7 @@
 #include "vfs/vfs.h"
 #include "print.h"
 #include "pmm.h"
+#include "errno.h"
 
 vnode_t *vfs_root;
 
@@ -27,7 +28,7 @@ int vfs_lookup_path(
     vnode_t **result
 ) {
     if (!root || !path || !result)
-        return -1;
+        return -EFAULT;
 
     *result = NULL;
 
@@ -59,7 +60,7 @@ int vfs_lookup_path(
         while (*path && *path != '/') {
 
             if (len >= sizeof(name) - 1)
-                return -2;
+                return -ENAMETOOLONG;
 
             name[len++] = *path++;
         }
@@ -87,7 +88,7 @@ int vfs_lookup_path(
          * O componente atual precisa ser diretório.
          */
         if (!S_ISDIR(current->mode))
-            return -3;
+            return -ENOTDIR;
 
         /*
          * Verifica se o mount possui lookup.
@@ -95,7 +96,7 @@ int vfs_lookup_path(
         if (!current->mnt ||
             !current->mnt->ops ||
             !current->mnt->ops->lookup)
-            return -4;
+            return -ENOSYS;
 
         vnode_t *next = NULL;
 
@@ -109,7 +110,7 @@ int vfs_lookup_path(
             return ret;
 
         if (!next)
-            return -5;
+            return -ENOENT;
 
         current = next;
     }
@@ -133,18 +134,6 @@ int vfs_lookup_path(
  *
  * Se os diretórios intermediários não existirem,
  * eles serão criados automaticamente.
- *
- * Exemplo:
- *
- * /lorem/ipsum/dolor.txt
- *
- *       /
- *       |
- *     lorem
- *       |
- *     ipsum
- *       |
- *    dolor.txt
  */
 int vfs_create_path(
     vnode_t *root,
@@ -153,7 +142,7 @@ int vfs_create_path(
     vnode_t **result
 ) {
     if (!root || !path || !result)
-        return -1;
+        return -EFAULT;
 
     *result = NULL;
 
@@ -195,7 +184,7 @@ int vfs_create_path(
         while (*path && *path != '/') {
 
             if (len >= sizeof(name) - 1)
-                return -2;
+                return -ENAMETOOLONG;
 
             name[len++] = *path++;
         }
@@ -223,7 +212,7 @@ int vfs_create_path(
          * O vnode atual precisa ser diretório.
          */
         if (!S_ISDIR(current->mode))
-            return -3;
+            return -ENOTDIR;
 
         /*
          * O filesystem precisa suportar lookup.
@@ -231,7 +220,7 @@ int vfs_create_path(
         if (!current->mnt ||
             !current->mnt->ops ||
             !current->mnt->ops->lookup)
-            return -4;
+            return -ENOSYS;
 
         vnode_t *next = NULL;
 
@@ -258,7 +247,7 @@ int vfs_create_path(
             if (*path) {
 
                 if (!S_ISDIR(current->mode))
-                    return -5;
+                    return -ENOTDIR;
             }
 
             /*
@@ -276,15 +265,21 @@ int vfs_create_path(
         }
 
         /*
+         * Se o lookup retornou um erro diferente de
+         * "não encontrado", propaga o erro.
+         */
+        if (ret < 0 && ret != -ENOENT)
+            return ret;
+
+        /*
          * Não encontrou.
          *
          * Agora precisamos criar.
          */
-
         if (!current->mnt ||
             !current->mnt->ops ||
             !current->mnt->ops->create)
-            return -6;
+            return -ENOSYS;
 
         /*
          * Ainda existem componentes depois deste.
@@ -301,10 +296,10 @@ int vfs_create_path(
             );
 
             if (ret < 0)
-                return -7;
+                return ret;
 
             if (!next)
-                return -8;
+                return -EIO;
 
             current = next;
 
@@ -324,15 +319,13 @@ int vfs_create_path(
         );
 
         if (ret < 0)
-            return -9;
+            return ret;
 
         if (!next)
-            return -10;
+            return -EIO;
 
         /*
-         * Muito importante:
-         *
-         * devolve o vnode criado.
+         * Devolve o vnode criado.
          */
         *result = next;
 
@@ -364,7 +357,7 @@ int vfs_remove_path(
     const char *path
 ) {
     if (!root || !path)
-        return -1;
+        return -EFAULT;
 
     size_t len = strlen(path);
 
@@ -384,7 +377,7 @@ int vfs_remove_path(
      * Não permite remover root.
      */
     if (len == 1 && path[0] == '/')
-        return -2;
+        return -EBUSY;
 
     /*
      * Encontra o último '/'.
@@ -401,7 +394,7 @@ int vfs_remove_path(
 
     if (name_len == 0 ||
         name_len >= 256)
-        return -3;
+        return -ENAMETOOLONG;
 
     char name[256];
 
@@ -430,7 +423,7 @@ int vfs_remove_path(
         size_t parent_len = slash - 1;
 
         if (parent_len >= sizeof(parent_path))
-            return -4;
+            return -ENAMETOOLONG;
 
         memcpy(
             parent_path,
@@ -456,13 +449,13 @@ int vfs_remove_path(
         return ret;
 
     if (!parent)
-        return -5;
+        return -ENOENT;
 
     /*
      * Pai precisa ser diretório.
      */
     if (!S_ISDIR(parent->mode))
-        return -6;
+        return -ENOTDIR;
 
     /*
      * Verifica remove().
@@ -470,7 +463,7 @@ int vfs_remove_path(
     if (!parent->mnt ||
         !parent->mnt->ops ||
         !parent->mnt->ops->remove)
-        return -7;
+        return -ENOSYS;
 
     return parent->mnt->ops->remove(
         parent,
@@ -502,7 +495,7 @@ int vfs_mount(
     if (!path ||
         !mnt ||
         !mnt->root)
-        return -1;
+        return -EFAULT;
 
     /*
      * Mount na raiz.
@@ -510,7 +503,7 @@ int vfs_mount(
     if (strcmp(path, "/") == 0) {
 
         if (vfs_root)
-            return -2;
+            return -EBUSY;
 
         vfs_root = mnt->root;
 
@@ -528,7 +521,7 @@ int vfs_mount(
      * Mountpoints diferentes de "/" ainda
      * não são suportados.
      */
-    return -3;
+    return -ENOSYS;
 }
 
 
@@ -545,24 +538,72 @@ int vfs_lookup(
     if (!dir ||
         !name ||
         !result)
-        return -1;
+        return -EFAULT;
 
     *result = NULL;
 
     if (!S_ISDIR(dir->mode))
-        return -2;
+        return -ENOTDIR;
 
     if (!dir->mnt ||
         !dir->mnt->ops)
-        return -3;
+        return -EFAULT;
 
     if (!dir->mnt->ops->lookup)
-        return -4;
+        return -ENOSYS;
 
     return dir->mnt->ops->lookup(
         dir,
         name,
         result
+    );
+}
+
+
+/*
+ * ============================================================
+ * VFS OPEN
+ * ============================================================
+ */
+int vfs_open(
+    const char *name,
+    vnode_t **result
+) {
+    return vfs_lookup_path(
+        vfs_root,
+        name,
+        result
+    );
+}
+
+
+/*
+ * ============================================================
+ * VFS READDIR
+ * ============================================================
+ */
+ssize_t vfs_readdir(
+    vnode_t *dir,
+    dirent_t *entries,
+    size_t max_entries
+) {
+    if (!dir || !entries)
+        return -EFAULT;
+
+    if (!S_ISDIR(dir->mode))
+        return -ENOTDIR;
+
+    if (!dir->mnt ||
+        !dir->mnt->ops)
+        return -EFAULT;
+
+    if (!dir->mnt->ops->readdir)
+        return -ENOSYS;
+
+    return dir->mnt->ops->readdir(
+        dir,
+        entries,
+        max_entries
     );
 }
 
@@ -581,19 +622,19 @@ int vfs_create(
     if (!dir ||
         !name ||
         !result)
-        return -1;
+        return -EFAULT;
 
     *result = NULL;
 
     if (!S_ISDIR(dir->mode))
-        return -2;
+        return -ENOTDIR;
 
     if (!dir->mnt ||
         !dir->mnt->ops)
-        return -3;
+        return -EFAULT;
 
     if (!dir->mnt->ops->create)
-        return -4;
+        return -ENOSYS;
 
     return dir->mnt->ops->create(
         dir,
@@ -614,17 +655,17 @@ int vfs_remove(
     const char *name
 ) {
     if (!dir || !name)
-        return -1;
+        return -EFAULT;
 
     if (!S_ISDIR(dir->mode))
-        return -2;
+        return -ENOTDIR;
 
     if (!dir->mnt ||
         !dir->mnt->ops)
-        return -3;
+        return -EFAULT;
 
     if (!dir->mnt->ops->remove)
-        return -4;
+        return -ENOSYS;
 
     return dir->mnt->ops->remove(
         dir,
@@ -645,14 +686,14 @@ ssize_t vfs_read(
     uint64_t offset
 ) {
     if (!file || !buffer)
-        return -1;
+        return -EFAULT;
 
     if (!file->mnt ||
         !file->mnt->ops)
-        return -2;
+        return -EFAULT;
 
     if (!file->mnt->ops->read)
-        return -3;
+        return -ENOSYS;
 
     return file->mnt->ops->read(
         file,
@@ -675,14 +716,14 @@ ssize_t vfs_write(
     uint64_t offset
 ) {
     if (!file || !buffer)
-        return -1;
+        return -EFAULT;
 
     if (!file->mnt ||
         !file->mnt->ops)
-        return -2;
+        return -EFAULT;
 
     if (!file->mnt->ops->write)
-        return -3;
+        return -ENOSYS;
 
     return file->mnt->ops->write(
         file,

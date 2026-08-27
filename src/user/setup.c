@@ -3,6 +3,7 @@
 
 #include "user/cr3.h"
 #include "user/exec.h"
+#include "user/sched/sched.h"
 #include "map.h"
 #include "string.h"
 #include "pmm.h"
@@ -79,9 +80,6 @@ void init_userspace()
      * =========================
      */
 
-    uint64_t stack_phys = bitmap_alloc(1);
-
-
     /*
      * Página da stack:
      *
@@ -92,20 +90,22 @@ void init_userspace()
      * 0x701000
      */
 
-    uint64_t stack_virt = 0x00007fffffffe000;
+    uint64_t stack_virt = 0x00007fffffff0000;
+uint64_t stack_top = stack_virt + 65536;
 
-    uint64_t stack_top = stack_virt + 4096;
+uint64_t stack_phys = bitmap_alloc(16);
 
     //kprintf("BUG?\n");
 
-    map_generic(
-        current_user_cr3,
-        stack_virt,
-        stack_phys,
-        PAGE_PRESENT |
-        PAGE_RW |
-        PAGE_USER
-    );
+    map_range_generic(
+    current_user_cr3,
+    stack_virt,
+    stack_phys,
+    PAGE_PRESENT |
+    PAGE_RW |
+    PAGE_USER,
+    65536
+);
 
 
     //kprintf("D\n");
@@ -136,6 +136,23 @@ void init_userspace()
     kprintf("RIP: 0x%lx\n", rip);
     kprintf("LOADING init (\"/init\")!\n");
 
+    task_t *task = phys_to_virt(malloc(sizeof(*task)));
+    if (task) {
+        *task = (task_t){0};
+        current = task;
+        start = task;
+        task->frame = (struct interrupt_frame){0};
+        task->kernel_rsp = phys_to_virt(bitmap_alloc(4));
+        task->frame.rip = rip;
+        task->frame.rsp = stack_top;
+        task->user_cr3 = cr3_phys;
+        task->frame.cs = 0x1B;
+        task->frame.ss = 0x23;
+        task->state = STATE_RUNNING;
+        task->next = NULL;
+    }
+
+    clear_screen();
 
     asm volatile(
         "cli\n"
@@ -147,6 +164,21 @@ void init_userspace()
 	"push $0x202\n"
 	"push $0x1B\n"
 	"push %2\n"
+    "xor %%rax, %%rax\n"
+    "xor %%rbx, %%rbx\n"
+    "xor %%rcx, %%rcx\n"
+    "xor %%rdx, %%rdx\n"
+    "xor %%rbp, %%rbp\n"
+    "xor %%rdi, %%rdi\n"
+    "xor %%rsi, %%rsi\n"
+    "xor %%r8, %%r8\n"
+    "xor %%r9, %%r9\n"
+    "xor %%r10, %%r10\n"
+    "xor %%r11, %%r11\n"
+    "xor %%r12, %%r12\n"
+    "xor %%r13, %%r13\n"
+    "xor %%r14, %%r14\n"
+    "xor %%r15, %%r15\n"
 
         "iretq\n"
 

@@ -1,6 +1,7 @@
 bits 64
 
 global _start
+extern main
 
 _start:
     xor rax, rax
@@ -9,6 +10,8 @@ _start:
     mov rdx, size
 
     int 0x80
+
+    call main
 
     jmp $
 

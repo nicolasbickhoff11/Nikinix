@@ -23,12 +23,19 @@ typedef struct node_ops node_ops_t;
 typedef struct mount mount_t;
 typedef struct vnode vnode_t;
 
+typedef struct dirent {
+    uint64_t inode;
+    uint8_t type;
+    char name[256];
+} dirent_t;
+
 struct node_ops {
     int (*lookup)(vnode_t *, const char *, vnode_t **);
     int (*create)(vnode_t *, const char *, uint32_t, vnode_t **);
     int (*remove)(vnode_t *, const char *);
     ssize_t (*read)(vnode_t *, void *, size_t, uint64_t);
     ssize_t (*write)(vnode_t *, const void *, size_t, uint64_t);
+    ssize_t (*readdir)(vnode_t *dir, dirent_t *entries, size_t max_entries);
 };
 
 struct mount {
@@ -63,4 +70,5 @@ ssize_t vfs_write(vnode_t *file, const void *buffer, size_t count, uint64_t offs
 int vfs_create_path(vnode_t *root, const char *path, mode_t mode, vnode_t **result);
 int vfs_lookup_path(vnode_t *root, const char *path, vnode_t **result);
 int vfs_remove_path(vnode_t *root, const char *path);
+int vfs_open(const char *name, vnode_t **result);
 #endif

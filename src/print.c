@@ -125,6 +125,11 @@ void fb_scroll() {
     cursor_y -= scroll_lines;
 }
 
+void clear_screen() {
+    clear_video();
+    com1_puts("\x1B[2J\x1B[H");
+}
+
 int fb_print(const char *s) {
     int total = 0;
     while (*s) { if (*s == '\x1B' && *(s+1) == 'c') { clear_video(); total += 2; s += 2; continue; } fb_print_char(*s++); total++; }

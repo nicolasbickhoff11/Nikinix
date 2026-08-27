@@ -18,4 +18,6 @@ void setup_syscall() {
     syscall_table[_NR_write] = _x64_sys_write;
     syscall_table[_NR_read] = _x64_sys_read;
     syscall_table[_NR_sleep] = _x64_sys_sleep;
+    syscall_table[_NR_uname] = _x64_sys_uname;
+    syscall_table[_NR_readdir] = _x64_sys_readdir;
 }

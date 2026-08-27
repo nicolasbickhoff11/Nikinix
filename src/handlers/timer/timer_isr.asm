@@ -20,6 +20,7 @@ isr_timer:
 	push r14
 	push r15
 	cld
+	mov rdi, rsp
 	sub rsp, 8
 	call timer_handler
 	add rsp, 8
