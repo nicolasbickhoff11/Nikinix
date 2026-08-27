@@ -21,6 +21,9 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 - MSR ✅
 - IDT ✅
 - syscalls ✅
+- list dirs ✅
+- unix-style errno ✅
+- shell ✅
 - syscall instruction ❌
 - OPEN, and File Operations syscalls ❌
 
@@ -29,6 +32,11 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 
 ## How to Compile
 run make and make iso
+
+## How to Run
+use the prebuilt nikinix iso in release or use your builded nikinix iso in QEMU, Vbox, etc
+but for run imediatelly run: make run
+warning: this OS needs PCIe support and ACPI and (I/O)APIC and LAPIC support
 
 ## License
 This project is licensed under the GNU General Public License v3.0 – see the [LICENSE](LICENSE) file for details.
