@@ -35,7 +35,9 @@ run make and make iso
 
 ## How to Run
 use the prebuilt nikinix iso in release or use your builded nikinix iso in QEMU, Vbox, etc
+
 but for run imediatelly run: make run
+
 warning: this OS needs PCIe support and ACPI and (I/O)APIC and LAPIC support
 
 ## License
