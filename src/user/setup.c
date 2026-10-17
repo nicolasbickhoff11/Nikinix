@@ -90,7 +90,7 @@ void init_userspace()
      * 0x701000
      */
 
-    uint64_t stack_virt = 0x00007fffffff0000;
+    uint64_t stack_virt = 0x00007ffffffe0000;
 uint64_t stack_top = stack_virt + 65536;
 
 uint64_t stack_phys = bitmap_alloc(16);
@@ -159,10 +159,10 @@ uint64_t stack_phys = bitmap_alloc(16);
 
         "mov %0, %%cr3\n"
 
-        "push $0x23\n"
+        "push $0x1B\n"
 	"push %1\n"
 	"push $0x202\n"
-	"push $0x1B\n"
+	"push $0x23\n"
 	"push %2\n"
     "xor %%rax, %%rax\n"
     "xor %%rbx, %%rbx\n"

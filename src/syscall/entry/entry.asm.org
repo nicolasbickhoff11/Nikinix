@@ -5,70 +5,51 @@ extern syscall_main
 extern kernel_int_stack
 
 syscall_entry:
-    ; ⚠️ BUG CRÍTICO: Não use variáveis globais em .bss para salvar o RSP!
-    ; Mesmo em single-core, se uma interrupção de hardware (como o timer) 
-    ; acontecer exatamente aqui, o RSP do usuário será destruído.
-    ; A solução padrão da arquitetura x86-64 é usar a instrução 'swapgs' 
-    ; ou o registrador MSR IA32_KERNEL_GS_BASE para guardar o RSP do usuário.
-    
-    ; Solução temporária via MSR se você não usa GS:
-    ; (Para fins didáticos, mantive sua lógica, mas corrigindo os registradores)
-
-    mov qword [tmp_reg], rsp        ; Salva o RSP do usuário
-    mov rsp, qword [kernel_int_stack] ; Carrega a pilha do Kernel
-
-    ; Salva TODOS os registradores na pilha do Kernel
     push r15
     push r14
     push r13
     push r12
-    push r11    ; Guarda as RFLAGS originais do usuário
+    push r11
     push r10
     push r9
     push r8
+    ; mov r10, qword [tmp_reg]
+    ; push rsp
+
+    ; push r10
     push rbp
     push rdi
     push rsi
     push rdx
-    push rcx    ; Guarda o RIP (endereço de retorno) original do usuário
+    push rcx
     push rbx
     push rax
 
-    ; Passa o ponteiro da estrutura de registradores para o C
-    
-    mov rdi, rsp            ; RDI = ponteiro da struct de registradores para o C
-    
-    mov r12, rsp            ; Salva o RSP atual em R12 (âncora segura que o C respeita)
-    and rsp, -16            ; Alinha a pilha a 16 bytes para a chamada C
-    
-    call syscall_main       ; Chama a função C (se usar R12, o GCC vai preservá-lo)
-    
-    mov rsp, r12            ; RECUPERA A PILHA: Restaura o RSP exatamente para o topo da struct!
+    mov rdi, rsp
 
-
-    ; Se a sua função syscall_main alterou os valores de RCX ou R11 na struct,
-    ; ela quebrou o retorno do sysret. Vamos garantir que eles voltem intactos.
-    ; Se o seu C precisa retornar um valor no RAX do usuário, ele deve alterar 
-    ; o valor dentro do ponteiro da struct (ex: regs->rax = resultado).
+    call syscall_main
 
     pop rax
     pop rbx
-    pop rcx     ; Restaura o RIP original do usuário em RCX (Obrigatório para o sysret)
+    pop rcx
     pop rdx
     pop rsi
     pop rdi
     pop rbp
+    ; pop qword [tmp_reg]
+    ; pop rsp
     pop r8
     pop r9
     pop r10
-    pop r11     ; Restaura as RFLAGS originais do usuário em R11 (Obrigatório para o sysret)
+    pop r11
     pop r12
     pop r13
     pop r14
     pop r15
-
-    mov rsp, qword [tmp_reg]        ; Restaura a pilha do usuário
-    sysretq                         ; Força o sysret em modo 64-bits (pode usar sysret no NASM)
+    ; mov rsp, qword [tmp_reg]
+    ; sysret
+    nop
+    iretq
 
 section .bss
 tmp_reg: resq 1

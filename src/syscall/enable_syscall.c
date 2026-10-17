@@ -11,7 +11,7 @@ void setup_syscall() {
     wrmsr(IA32_EFER, efer);
     uint64_t star = rdmsr(IA32_STAR);
     star &= ~0xFFFFFFFFFFFFFFFFULL;
-    star |= ((uint64_t)0x18 << 48) | ((uint64_t)0x08 << 32);
+    star |= ((uint64_t)0x13 << 48) | ((uint64_t)0x08 << 32);
     wrmsr(IA32_STAR, star);
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
     wrmsr(IA32_FMASK, (1 << 9) | (1 << 8));
@@ -20,4 +20,8 @@ void setup_syscall() {
     syscall_table[_NR_sleep] = _x64_sys_sleep;
     syscall_table[_NR_uname] = _x64_sys_uname;
     syscall_table[_NR_readdir] = _x64_sys_readdir;
+    syscall_table[_NR_mkdir] = _x64_sys_mkdir;
+    syscall_table[_NR_create] = _x64_sys_create;
+    syscall_table[_NR_remove] = _x64_sys_remove;
+    syscall_table[_NR_sethostname] = _x64_sys_sethostname;
 }

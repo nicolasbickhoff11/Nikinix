@@ -1,5 +1,6 @@
 #include "syscall/regs.h"
 #include "vfs/vfs.h"
+#include "user/sched/sched.h"
 #include "print.h"
 #include "errno.h"
 #include <stdint.h>
@@ -9,6 +10,9 @@ long (*syscall_table[256])(struct user_regs *regs) = {0};
 extern char last_char;
 
 typedef long ssize_t;
+
+//int sys_open(const char *name, int flags, mode_t mode)
+//    if (!name) return -EFAULT;
 
 ssize_t sys_write(int fd, const void *buf, size_t size)
 {
@@ -91,13 +95,15 @@ struct utsname {
     char machine[65];
 };
 
+char hostname[512] = "nikinix";
+
 int sys_uname(struct utsname *ptr) {
     if (!ptr) return -EFAULT;
 
     strcpy(ptr->sysname, "Nikinix");
-    strcpy(ptr->nodename, "nikinix");
-    strcpy(ptr->release, "v0.5");
-    strcpy(ptr->version, "No SIGSEGV so far v0.5");
+    strncpy(ptr->nodename, hostname, 64);
+    strcpy(ptr->release, "v0.6");
+    strcpy(ptr->version, "No SIGSEGV so far v0.6");
     strcpy(ptr->machine, "x86_64");
     return 0;
 }
@@ -121,6 +127,31 @@ ssize_t sys_readdir(const char *name, dirent_t *entries, size_t max_entries)
     return result;
 }
 
+int sys_mkdir(const char *name, mode_t mode) {
+    vnode_t *res = NULL;
+    int r = vfs_create_path(vfs_root, name, mode | S_IFDIR, &res);
+    return r;
+}
+
+int sys_create(const char *name, mode_t mode) {
+    vnode_t *res = NULL;
+    int r = vfs_create_path(vfs_root, name, mode | S_IFREG, &res);
+    return r;
+}
+
+int sys_remove(const char *name) {
+    int r = vfs_remove_path(vfs_root, name);
+    return r;
+}
+
+int sys_sethostname(const char *new_hostname) {
+    if (strlen(new_hostname) >= 512) return -ENOMEM;
+    strncpy(hostname, new_hostname, 512);
+    hostname[strlen(new_hostname)] = '\0';
+    return 0;
+}
+
+
 extern uint64_t timer_ticks;
 
 int sys_sleep(int seconds) {
@@ -130,6 +161,22 @@ int sys_sleep(int seconds) {
         asm volatile ("hlt");
     }
     return 0;
+}
+
+long _x64_sys_sethostname(struct user_regs *regs) {
+    return sys_sethostname(regs->rdi);
+}
+
+long _x64_sys_mkdir(struct user_regs *regs) {
+    return sys_mkdir(regs->rdi, regs->rsi);
+}
+
+long _x64_sys_create(struct user_regs *regs) {
+    return sys_create(regs->rdi, regs->rsi);
+}
+
+long _x64_sys_remove(struct user_regs *regs) {
+    return sys_remove(regs->rdi);
 }
 
 long _x64_sys_sleep(struct user_regs *regs) {
@@ -153,8 +200,7 @@ long _x64_sys_uname(struct user_regs *regs) {
 }
 
 void syscall_main(struct user_regs *regs) {
-
-    uint64_t num = regs->rax;
+    long num = regs->rax;
     if (!syscall_table[num]) {
         regs->rax = -ENOSYS; // ENOSYS
         return;

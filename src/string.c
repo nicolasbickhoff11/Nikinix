@@ -97,3 +97,25 @@ char *strcpy(char *dest, const char *src)
 
     return original;
 }
+
+char *strncpy(char *dest, const char *src, size_t n) {
+    char *saved_dest = dest;
+
+    // Copia os caracteres de src para dest até atingir n ou o fim de src
+    while (n > 0 && *src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+        n--;
+    }
+
+    // Se n ainda for maior que zero, preenche o restante com '\0'
+    while (n > 0) {
+        *dest = '\0';
+        dest++;
+        n--;
+    }
+
+    // Retorna o ponteiro original do destino
+    return saved_dest;
+}

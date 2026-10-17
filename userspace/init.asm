@@ -9,7 +9,8 @@ _start:
     mov rsi, buf
     mov rdx, size
 
-    int 0x80
+    ;int 0x80
+    syscall
 
     call main
 
