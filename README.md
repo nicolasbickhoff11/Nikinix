@@ -24,11 +24,15 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 - list dirs ✅
 - unix-style errno ✅
 - shell ✅
-- syscall instruction ❌
-- OPEN, and File Operations syscalls ❌
+- syscall instruction ✅
+- OPEN, and File Operations syscalls 🚧
+- Scheduler 🚧
+- Fork and Process Operations syscalls ❌
+- SMAP / SMEP ❌
 
 ## TODO
-🚧 some bugs while i'm trying to implement syscall function
+🚧 switch to copy_to_user and write_to_user
+🚧 SMAP / SMEP
 
 ## How to Compile
 run make and make iso
