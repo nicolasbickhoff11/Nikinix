@@ -10,6 +10,18 @@ unsigned long xor_seed(unsigned long seed)
     return 0;
 }
 
+inline void reflect_2D(int* x, int* y, int w, int h)
+{
+	*x = abs(*x);
+	*y = abs(*y);
+
+	int rx = *x / w;
+	int ry = *y / h;
+
+	*x = (rx % 2 == 0) ? (*x % w) : (w - 1 - (*x % w));
+	*y = (ry % 2 == 0) ? (*y % h) : (h - 1 - (*y % h));
+}
+
 int xor_shift(void)
 {
     xsint = xsint * 1103515245 + 12345;
