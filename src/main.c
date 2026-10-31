@@ -320,7 +320,7 @@ void kmain(void) {
     set_idt_entry((uint64_t)isr_page_fault, 0x0E, 0x08, 0x00, 0x8E);
     set_idt_entry((uint64_t)isr_general_fault, 0x0D, 0x08, 0x00, 0x8E);
     set_idt_entry((uint64_t)isr_ud, 0x06, 0x08, 0x00, 0x8E);
-    set_idt_entry((uint64_t)syscall_entry, 0x80, 0x08, 0x00, 0xEE);
+    //set_idt_entry((uint64_t)syscall_entry, 0x80, 0x08, 0x00, 0xEE);
     set_idt_entry((uint64_t)isr_breakpoint, 0x03, 0x08, 0x00, 0xEF);
     set_idt_entry((uint64_t)isr_double_fault, 0x08, 0x08, 0x00, 0x8E);
 
@@ -368,10 +368,7 @@ void kmain(void) {
     kprintf("[LOG] Manufacturer: %s\n[LOG] Product Name: %s\n[LOG] Version: %s\n", info.manufacturer, info.productname, info.version);
     if (info.serialnumber) {
         kprintf("[LOG] Serial Number: %s\n", info.serialnumber);
-    }
-    //if (memcmp(info.productname, "VirtualBox", 10) == 0 || memcmp(info.manufacturer, "VMware, Inc.", 12) == 0 || memcmp(info.manufacturer, "QEMU", 4) == 0) {
-    //    kprintf("[TROLL] KKKK Voce so usa vm porque voce e um pobretao kkkkk e nao tem dinheiro.\n");
-    //}
+	}
     kprintf("[LOG] BIOS Vendor: %s\n[LOG] BIOS Version: %s\n[LOG] BIOS Release Date: %s\n", info.bios_vendor, info.bios_version, info.bios_release_date);
 
     pmm_init();
