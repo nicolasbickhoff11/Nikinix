@@ -8,7 +8,9 @@
     Complementary Metal-Oxide Semiconductor or only CMOS is a battery puted on
     mother board to store basic informations about system like date, time and memory size
 
-    this code manipulate and use CMOS battery things 
+    this code manipulate and use CMOS battery things
+
+    thanks to NicolasBickHoff for inviting me
 */
 
 uint8_t day, month, year;
