@@ -1,3 +1,4 @@
+; small changes by Danoni631
 [bits 64]
 
 [global _start]
