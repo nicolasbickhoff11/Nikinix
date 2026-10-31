@@ -1,7 +1,7 @@
-bits 64
+[bits 64]
 
-global _start
-extern main
+[global _start]
+[extern entry]
 
 _start:
     xor rax, rax
@@ -12,9 +12,7 @@ _start:
     ;int 0x80
     syscall
 
-    call main
-
-    jmp $
+    call entry
 
 buf: db "No SIGSEGV so far, I hate SIGSEGVs and I love Nikinix", 10
 size: equ $ - buf
