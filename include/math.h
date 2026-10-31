@@ -15,6 +15,7 @@ unsigned int xs;
 static float psSinValues[4096];
 
 unsigned long xor_seed(unsigned long seed);
+inline void reflect_2D(int* x, int* y, int w, int h);
 int xor_shift(void);
 int dword_xor_shift(void);
 double sine(double x);
