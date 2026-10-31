@@ -2,8 +2,8 @@
 
 [bits 64]
 [extern main]
-[global entry]
+[global _start]
 
-entry:
+_start:
     call main
     jmp $
