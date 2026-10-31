@@ -186,6 +186,8 @@ uint64_t ram_total = 0;
 extern void tar_list(void *initrd, uint64_t initrd_size);
 
 #include <stdint.h>
+#include "cmos.h" // added Danilo's CMOS header
+
 
 static inline uint64_t read_cr0(void)
 {
@@ -527,6 +529,7 @@ kprintf("IOAPIC entry: %llx\n", entry);
 
     read_rtc(&rtc);
     kprintf("[LOG] time: %d/%d/%d %02d:%02d:%02d           ", rtc.day, rtc.month, rtc.year, rtc.hour, rtc.min, rtc.sec);
+    show_cmos_memory();
 
     //while (1) {
     //    read_rtc(&rtc);

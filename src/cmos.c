@@ -3,7 +3,7 @@
 #include "print.h"
 
 /*
-    Coded by Danoni631
+    Coded by Danoni631 and nicolasbickhoff11
 
     Complementary Metal-Oxide Semiconductor or only CMOS is a battery puted on
     mother board to store basic informations about system like date, time and memory size
@@ -52,9 +52,7 @@ void show_cmos_memory()
 {
     uint16_t cmos_memory = get_cmos_memory();
 
-    kprintf("Total CMOS memory: ");
-    print_hex(cmos_memory);
-    kprintf("\n");
+    kprintf("Total CMOS memory: %x\n", cmos_memory);
 }
 
 void show_cmos_date()
@@ -65,9 +63,5 @@ void show_cmos_date()
     month = ((month / 16) * 10) + (month & 0x0F);
     year  = ((year  / 16) * 10) + (year  & 0x0F);
 
-    print_dec(month);
-    kprintf("/");
-    print_dec(day);
-    kprintf("/");
-    print_dec(year);
+    kprintf("%d/%d/%d", month, day, year);
 }
