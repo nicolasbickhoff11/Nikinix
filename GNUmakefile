@@ -136,9 +136,10 @@ clean:
 
 .PHONY: iso
 iso:
+	nasm -f elf64 userspace/entry.asm -o userspace/entry.o
 	nasm -f elf64 userspace/init.asm -o userspace/init.o
 	gcc -ffreestanding -nostdlib -g -fno-PIE -c userspace/init.c -o userspace/init_o.o
-	ld -o initrd/init userspace/init_o.o userspace/init.o
+	ld -o initrd/init userspace/init_o.o userspace/entry.o userspace/init.o
 	./make-iso.sh
 
 .PHONY: run
