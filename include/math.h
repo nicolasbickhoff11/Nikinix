@@ -1,4 +1,15 @@
+typedef struct
+{
+    float x;
+    float y;
+    float z;
+} Vertex;
+
 #define PI 3.141592f
+#define RANDMAX 32767
+#define SUMLIM 50
+
+#define abs(a) (((a) > 0) ? a : -(a))
 
 unsigned int xs;
 static float psSinValues[4096];
