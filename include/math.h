@@ -5,6 +5,7 @@ static float psSinValues[4096];
 
 unsigned long xor_seed(unsigned long seed);
 int xor_shift(void);
+int dword_xor_shift(void);
 double sine(double x);
 double cosine(double x);
 double square_root(double x);
