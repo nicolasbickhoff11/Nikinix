@@ -3,7 +3,7 @@
 
 #include "audiocardboard/audio.h"
 
-int playing
+int playing = 0;
 
 void write_dsp(uint8_t command)
 {
@@ -61,11 +61,16 @@ void soundblaster_play(uint8_t* buff, uint16_t size)
     setup_dma(buff, size);
     write_dsp(0x40);
     write_dsp(256 - (1000000 / 8000); // 11kHz
-    wrtie_dsp(0x14);
+    write_dsp(0x14);
     write_dsp((size - 1) & 0xFF);
     write_dsp((size - 1) >> 8);
 
-    for (int i = 0; i < 10000000; i++);
+    // fixing for sleep function
+    //for (int i = 0; i < 10000000; i++);
+    uint64_t future_tick = timer_ticks + 100 * 10;
+    while (timer_ticks < future_tick) {
+        asm volatile ("hlt");
+    }
     playing = 0x00;
 }
 
