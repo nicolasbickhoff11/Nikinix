@@ -48,3 +48,7 @@ warning: this OS needs PCIe support and ACPI and (I/O)APIC and LAPIC support
 
 ## License
 This project is licensed under the GNU General Public License v3.0 – see the [LICENSE](LICENSE) file for details.
+
+## Screenshots
+<p align="center"><img src="log.png"></p>
+<p align="center"><img src="shell.png"></p>
