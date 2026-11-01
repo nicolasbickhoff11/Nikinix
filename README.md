@@ -12,6 +12,7 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 - APIC ✅
 - Bitmap Allocator ✅
 - VMM ✅
+- Audio Cardboard driver ✅
 - Userspace ✅
 - TAR initrd format ✅
 - LAPIC Timer ✅
