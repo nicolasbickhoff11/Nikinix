@@ -24,4 +24,6 @@ void setup_syscall() {
     syscall_table[_NR_create] = _x64_sys_create;
     syscall_table[_NR_remove] = _x64_sys_remove;
     syscall_table[_NR_sethostname] = _x64_sys_sethostname;
+    syscall_table[_NR_getcwd] = _x64_sys_getcwd;
+    syscall_table[_NR_chdir] = _x64_sys_chdir;
 }

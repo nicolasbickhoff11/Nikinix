@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 #include "vfs/vfs.h"
 #include "print.h"
 #include "pmm.h"
@@ -23,16 +24,16 @@ vnode_t *vfs_root;
  * Retorna o vnode encontrado em *result.
  */
 int vfs_lookup_path(
-    vnode_t *root,
+    vnode_t *start,
     const char *path,
     vnode_t **result
 ) {
-    if (!root || !path || !result)
+    if (!start || !path || !result)
         return -EFAULT;
 
     *result = NULL;
 
-    vnode_t *current = root;
+    vnode_t *current = start;
 
     /*
      * Caminho absoluto.
@@ -136,17 +137,17 @@ int vfs_lookup_path(
  * eles serão criados automaticamente.
  */
 int vfs_create_path(
-    vnode_t *root,
+    vnode_t *start,
     const char *path,
     mode_t mode,
     vnode_t **result
 ) {
-    if (!root || !path || !result)
+    if (!start || !path || !result)
         return -EFAULT;
 
     *result = NULL;
 
-    vnode_t *current = root;
+    vnode_t *current = start;
 
     /*
      * Caminho absoluto.
@@ -155,12 +156,12 @@ int vfs_create_path(
         path++;
 
     /*
-     * Caminho vazio -> root.
+     * Caminho vazio -> vnode inicial.
      *
      * Isso também cobre "/".
      */
     if (!*path) {
-        *result = root;
+        *result = start;
         return 0;
     }
 
@@ -353,10 +354,10 @@ int vfs_create_path(
  * /lorem/test.txt
  */
 int vfs_remove_path(
-    vnode_t *root,
+    vnode_t *start,
     const char *path
 ) {
-    if (!root || !path)
+    if (!start || !path)
         return -EFAULT;
 
     size_t len = strlen(path);
@@ -374,7 +375,7 @@ int vfs_remove_path(
         len--;
 
     /*
-     * Não permite remover root.
+     * Não permite remover a raiz.
      */
     if (len == 1 && path[0] == '/')
         return -EBUSY;
@@ -440,7 +441,7 @@ int vfs_remove_path(
     vnode_t *parent = NULL;
 
     int ret = vfs_lookup_path(
-        root,
+        start,
         parent_path,
         &parent
     );
@@ -731,4 +732,92 @@ ssize_t vfs_write(
         count,
         offset
     );
+}
+
+/*
+ * Resolve um caminho usando o filesystem montado na raiz.
+ * O callback do filesystem deve tratar caminhos absolutos e relativos;
+ * no RAMFS, os relativos começam em current->current_cwd.dir.
+ *
+ * Erros são retornados como ponteiros codificados (ERR_PTR).
+ */
+#ifndef ERR_PTR
+#define ERR_PTR(error) ((vnode_t *)(intptr_t)(error))
+#endif
+
+#ifndef IS_ERR
+#define IS_ERR(pointer) ((uintptr_t)(pointer) >= (uintptr_t)-4095)
+#endif
+
+#ifndef PTR_ERR
+#define PTR_ERR(pointer) ((int)(intptr_t)(pointer))
+#endif
+
+vnode_t *vfs_resolve(const char *path) {
+    if (!path || !vfs_root)
+        return ERR_PTR(-EFAULT);
+
+    if (!vfs_root->mnt ||
+        !vfs_root->mnt->ops ||
+        !vfs_root->mnt->ops->resolve)
+        return ERR_PTR(-ENOSYS);
+
+    return vfs_root->mnt->ops->resolve(path);
+}
+
+/*
+ * Reconstrói o caminho absoluto percorrendo os vnodes pais.
+ * Implementação genérica: usa vnode->name, sem conhecer o filesystem.
+ */
+int vnode_get_path(vnode_t *node, char *buffer, size_t size) {
+    if (!node || !buffer || !vfs_root)
+        return -EINVAL;
+
+    if (size < 2)
+        return -ENAMETOOLONG;
+
+    vnode_t *parents[64];
+    size_t count = 0;
+
+    while (node && count < (sizeof(parents) / sizeof(parents[0]))) {
+        parents[count++] = node;
+
+        if (node == vfs_root)
+            break;
+
+        node = node->parent;
+    }
+
+    /* A cadeia de pais precisa chegar à raiz do VFS. */
+    if (count == 0 || parents[count - 1] != vfs_root)
+        return -EINVAL;
+
+    size_t pos = 0;
+    buffer[pos++] = '/';
+
+    /* Percorre da raiz até o vnode solicitado. */
+    for (size_t i = count - 1; i > 0; i--) {
+        const char *name = parents[i - 1]->name;
+
+        if (!name)
+            return -EINVAL;
+
+        size_t len = strlen(name);
+        size_t separator = (i > 1) ? 1 : 0;
+
+        /* Reserva espaço para nome, possível '/', e '\0'. */
+        if (len > size - pos ||
+            separator > size - pos - len ||
+            pos + len + separator >= size)
+            return -ENAMETOOLONG;
+
+        memcpy(buffer + pos, name, len);
+        pos += len;
+
+        if (separator)
+            buffer[pos++] = '/';
+    }
+
+    buffer[pos] = '\0';
+    return 0;
 }

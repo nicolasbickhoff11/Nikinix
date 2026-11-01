@@ -1,4 +1,5 @@
 #include "fs/ramfs/ramfs.h"
+#include "user/sched/sched.h"
 #include "vfs/vfs.h"
 #include "malloc.h"
 #include "string.h"
@@ -41,6 +42,7 @@ int ramfs_lookup(
                 return -ENOMEM;
 
             res->mode = entry->mode;
+            res->name = entry->name;
             res->inode = entry->inode;
             res->mnt = dir->mnt;
             res->private = entry;
@@ -200,6 +202,7 @@ int ramfs_create(
     res->inode = new_entry->inode;
     res->mnt = dir->mnt;
     res->private = new_entry;
+    res->name = new_entry->name;
 
     /*
      * O pai é o diretório onde o objeto foi criado.
@@ -361,6 +364,70 @@ ssize_t ramfs_write(
     return (ssize_t)count;
 }
 
+vnode_t *ramfs_resolve(const char *path) {
+    if (!path || !*path || !vfs_root)
+        return NULL;
+
+    /*
+     * Caminhos absolutos começam em vfs_root.
+     * Caminhos relativos começam no CWD do processo;
+     * se ainda não houver CWD, começam em vfs_root.
+     */
+    vnode_t *walk;
+
+    if (path[0] == '/') {
+        walk = vfs_root;
+    } else {
+        walk = (current && current->current_cwd.dir)
+             ? current->current_cwd.dir
+             : vfs_root;
+    }
+
+    while (*path) {
+        while (*path == '/')
+            path++;
+
+        if (!*path)
+            break;
+
+        char component[256];
+        size_t len = 0;
+
+        while (*path && *path != '/') {
+            if (len >= sizeof(component) - 1)
+                return NULL;
+
+            component[len++] = *path++;
+        }
+
+        component[len] = '\0';
+
+        if (!strcmp(component, "."))
+            continue;
+
+        if (!strcmp(component, "..")) {
+            if (walk->parent)
+                walk = walk->parent;
+            else
+                walk = vfs_root;
+
+            continue;
+        }
+
+        if (!S_ISDIR(walk->mode))
+            return NULL;
+
+        vnode_t *next = NULL;
+        int ret = ramfs_lookup(walk, component, &next);
+
+        if (ret < 0 || !next)
+            return NULL;
+
+        walk = next;
+    }
+
+    return walk;
+}
 
 node_ops_t ramfs_ops = {
     .create  = ramfs_create,
@@ -368,56 +435,58 @@ node_ops_t ramfs_ops = {
     .remove  = ramfs_remove,
     .read    = ramfs_read,
     .write   = ramfs_write,
-    .readdir = ramfs_readdir
+    .readdir = ramfs_readdir,
+    .resolve = ramfs_resolve
 };
 
 
 mount_t *create_ramfs(void)
 {
-    ramfs_node_t *root =
+    ramfs_node_t *root_node =
         malloc(sizeof(ramfs_node_t));
 
-    if (!root)
+    if (!root_node)
         return NULL;
 
-    root->name = strdup("/");
+    root_node->name = strdup("/");
 
-    if (!root->name) {
-        free(root);
+    if (!root_node->name) {
+        free(root_node);
         return NULL;
     }
 
-    root->mode = S_IFDIR | 0777;
-    root->inode = 1;
-    root->data = NULL;
-    root->current_data_size = 0;
-    root->children = NULL;
-    root->children_count = 0;
-    root->parent = NULL;
-    root->next = NULL;
+    root_node->mode = S_IFDIR | 0777;
+    root_node->inode = 1;
+    root_node->data = NULL;
+    root_node->current_data_size = 0;
+    root_node->children = NULL;
+    root_node->children_count = 0;
+    root_node->parent = NULL;
+    root_node->next = NULL;
 
     vnode_t *root_vfs =
         malloc(sizeof(vnode_t));
 
     if (!root_vfs) {
-        free(root->name);
-        free(root);
+        free(root_node->name);
+        free(root_node);
         return NULL;
     }
 
-    root_vfs->mode = root->mode;
-    root_vfs->inode = root->inode;
+    root_vfs->mode = root_node->mode;
+    root_vfs->inode = root_node->inode;
     root_vfs->mnt = NULL;
-    root_vfs->private = root;
+    root_vfs->private = root_node;
     root_vfs->parent = NULL;
+    root_vfs->name = root_node->name;
 
     mount_t *mount =
         malloc(sizeof(mount_t));
 
     if (!mount) {
         free(root_vfs);
-        free(root->name);
-        free(root);
+        free(root_node->name);
+        free(root_node);
         return NULL;
     }
 

@@ -108,20 +108,40 @@ int sys_uname(struct utsname *ptr) {
     return 0;
 }
 
+#ifndef ERR_PTR
+#define ERR_PTR(error) ((vnode_t *)(intptr_t)(error))
+#endif
+
+#ifndef IS_ERR
+#define IS_ERR(pointer) ((uintptr_t)(pointer) >= (uintptr_t)-4095)
+#endif
+
+#ifndef PTR_ERR
+#define PTR_ERR(pointer) ((int)(intptr_t)(pointer))
+#endif
+
 ssize_t sys_readdir(const char *name, dirent_t *entries, size_t max_entries)
 {
-    if (!name || !entries) {
+    if (!name || !entries)
         return -EFAULT;
-    }
-    vnode_t *node = NULL;
 
-    int ret = vfs_open(name, &node);
-    if (ret < 0) {
-        return ret;
-    }
+    if (!current || !current->current_cwd.dir)
+        return -ENOENT;
+
+    vnode_t *node = vfs_resolve(name);
+
+    if (IS_ERR(node))
+        return PTR_ERR(node);
+
+    if (!node)
+        return -ENOENT;
+
+    if (!S_ISDIR(node->mode))
+        return -ENOTDIR;
+
     ssize_t result = vfs_readdir(node, entries, max_entries);
 
-    // se o VFS possuir refcount/close:
+    // Se o VFS possuir refcount/close:
     // vnode_put(node);
 
     return result;
@@ -129,18 +149,18 @@ ssize_t sys_readdir(const char *name, dirent_t *entries, size_t max_entries)
 
 int sys_mkdir(const char *name, mode_t mode) {
     vnode_t *res = NULL;
-    int r = vfs_create_path(vfs_root, name, mode | S_IFDIR, &res);
+    int r = vfs_create_path(current->current_cwd.dir == NULL ? vfs_root : current->current_cwd.dir, name, mode | S_IFDIR, &res);
     return r;
 }
 
 int sys_create(const char *name, mode_t mode) {
     vnode_t *res = NULL;
-    int r = vfs_create_path(vfs_root, name, mode | S_IFREG, &res);
+    int r = vfs_create_path(current->current_cwd.dir == NULL ? vfs_root : current->current_cwd.dir, name, mode | S_IFREG, &res);
     return r;
 }
 
 int sys_remove(const char *name) {
-    int r = vfs_remove_path(vfs_root, name);
+    int r = vfs_remove_path(current->current_cwd.dir == NULL ? vfs_root : current->current_cwd.dir, name);
     return r;
 }
 
@@ -148,6 +168,30 @@ int sys_sethostname(const char *new_hostname) {
     if (strlen(new_hostname) >= 512) return -ENOMEM;
     strncpy(hostname, new_hostname, 512);
     hostname[strlen(new_hostname)] = '\0';
+    return 0;
+}
+
+int sys_getcwd(char *buf, size_t len) {
+    vnode_t *node = current->current_cwd.dir;
+    if (!node) return -EFAULT;
+    return vnode_get_path(node, buf, len);
+}
+
+int sys_chdir(const char *dir) {
+    if (!dir) return -EFAULT;
+
+    vnode_t *node = vfs_resolve(dir);
+
+    if (IS_ERR(node))
+        return PTR_ERR(node);
+
+    if (!node)
+        return -ENOENT;
+
+    if (!S_ISDIR(node->mode))
+        return -ENOTDIR;
+
+    current->current_cwd.dir = node;
     return 0;
 }
 
@@ -161,6 +205,14 @@ int sys_sleep(int seconds) {
         asm volatile ("hlt");
     }
     return 0;
+}
+
+long _x64_sys_chdir(struct user_regs *regs) {
+    return sys_chdir(regs->rdi);
+}
+
+long _x64_sys_getcwd(struct user_regs *regs) {
+    return sys_getcwd(regs->rdi, regs->rsi);
 }
 
 long _x64_sys_sethostname(struct user_regs *regs) {

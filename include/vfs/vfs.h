@@ -29,6 +29,17 @@ typedef struct dirent {
     char name[256];
 } dirent_t;
 
+struct vnode {
+    uint32_t mode;
+    uint64_t inode;
+
+    struct vnode *parent;
+    mount_t *mnt;
+    const char *name;
+
+    void *private;
+};
+
 struct node_ops {
     int (*lookup)(vnode_t *, const char *, vnode_t **);
     int (*create)(vnode_t *, const char *, uint32_t, vnode_t **);
@@ -36,6 +47,7 @@ struct node_ops {
     ssize_t (*read)(vnode_t *, void *, size_t, uint64_t);
     ssize_t (*write)(vnode_t *, const void *, size_t, uint64_t);
     ssize_t (*readdir)(vnode_t *dir, dirent_t *entries, size_t max_entries);
+    vnode_t *(*resolve)(const char *path);
 };
 
 struct mount {
@@ -43,17 +55,6 @@ struct mount {
     void *fs_private;
     node_ops_t *ops;
     uint64_t inode_count;
-};
-
-
-struct vnode {
-    uint32_t mode;
-    uint64_t inode;
-
-    struct vnode *parent;
-    mount_t *mnt;
-
-    void *private;
 };
 
 typedef uint32_t mode_t;
@@ -71,4 +72,7 @@ int vfs_create_path(vnode_t *root, const char *path, mode_t mode, vnode_t **resu
 int vfs_lookup_path(vnode_t *root, const char *path, vnode_t **result);
 int vfs_remove_path(vnode_t *root, const char *path);
 int vfs_open(const char *name, vnode_t **result);
+vnode_t *vfs_resolve(const char *path);
+int vnode_get_path(vnode_t *node, char *buffer, size_t size);
+
 #endif

@@ -146,10 +146,12 @@ uint64_t stack_phys = bitmap_alloc(16);
         task->frame.rip = rip;
         task->frame.rsp = stack_top;
         task->user_cr3 = cr3_phys;
-        task->frame.cs = 0x1B;
-        task->frame.ss = 0x23;
+        task->frame.cs = 0x23;
+        task->frame.ss = 0x1B;
         task->state = STATE_RUNNING;
         task->next = NULL;
+        task->parent = NULL;
+        task->current_cwd.dir = vfs_root;
     }
 
     clear_screen();

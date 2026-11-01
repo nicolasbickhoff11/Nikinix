@@ -216,9 +216,16 @@ int main(void)
 
         syscall(3, &uts);
 
+        char path[256] = {0};
+
+        syscall(9, path, sizeof(path));
+
         puts_fd1("root@");
         puts_fd1(uts.nodename);
-        puts_fd1(":~# ");
+        puts_fd1(":");
+        puts_fd1(path);
+        puts_fd1("# ");
+
 
         long i = syscall(1, 0, buffer, sizeof(buffer) - 1);
 
@@ -293,6 +300,68 @@ int main(void)
 
             continue;
         }
+        /* cwd */
+
+        if (strcmp(buffer, "pwd") == 0) {
+            char path[256] = {0};
+
+            long r = syscall(9, path, sizeof(path));
+
+            if (r < 0) {
+                puts_fd1("pwd: cannot get current directory\n");
+                continue;
+            }
+
+            path[255] = '\0';
+
+            puts_fd1(path);
+            puts_fd1("\n");
+
+            continue;
+        }
+
+        /* cd */
+
+        if (strcmp(buffer, "cd") == 0 ||
+            strncmp(buffer, "cd ", 3) == 0) {
+
+            if (strcmp(buffer, "cd") == 0) {
+                puts_fd1("cd: missing operand\n");
+                continue;
+            }
+
+            char *path = buffer + 3;
+
+            while (*path == ' ')
+                path++;
+
+            if (*path == '\0') {
+                puts_fd1("cd: missing operand\n");
+                continue;
+            }
+
+            long r = syscall(10, path);
+
+            if (r < 0) {
+                if (r == -ENOENT) {
+                    print_error_path("cd: ", path,
+                                     ": no such directory\n");
+                } else if (r == -ENOTDIR) {
+                    print_error_path("cd: ", path,
+                                     ": not a directory\n");
+                } else if (r == -EACCES) {
+                    print_error_path("cd: ", path,
+                                     ": permission denied\n");
+                } else {
+                    print_error_path("cd: ", path,
+                                     ": cannot change directory\n");
+                }
+
+                continue;
+            }
+
+            continue;
+        }
 
         /* sethostname */
 
@@ -333,7 +402,7 @@ if (strcmp(buffer, "sethostname") == 0 ||
             char *path;
 
             if (strcmp(buffer, "ls") == 0) {
-                path = "/";
+                path = ".";
             } else {
                 path = buffer + 3;
 

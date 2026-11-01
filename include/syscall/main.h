@@ -12,6 +12,8 @@
 #define _NR_create 6
 #define _NR_remove 7
 #define _NR_sethostname 8
+#define _NR_getcwd 9
+#define _NR_chdir 10
 
 long _x64_sys_write(struct user_regs *regs);
 long _x64_sys_read(struct user_regs *regs);
@@ -22,5 +24,7 @@ long _x64_sys_mkdir(struct user_regs *regs);
 long _x64_sys_create(struct user_regs *regs);
 long _x64_sys_remove(struct user_regs *regs);
 long _x64_sys_sethostname(struct user_regs *regs);
+long _x64_sys_getcwd(struct user_regs *regs);
+long _x64_sys_chdir(struct user_regs *regs);
 
 #endif

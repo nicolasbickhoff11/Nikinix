@@ -40,8 +40,9 @@ uint64_t load_elf(uint64_t *user_cr3, const char *path) {
     r = vfs_read(file, p, ehdr.e_phentsize * ehdr.e_phnum, ehdr.e_phoff);
     if (r < 0) return -10;
 
-    Elf64_Phdr *entry = p;
+    Elf64_Phdr *entry = 0;
     for (uint16_t i = 0; i < ehdr.e_phnum; i++) {
+        entry = &p[i];
         if (entry->p_type != PT_LOAD) continue;
         uint64_t flags = 0;
         if (entry->p_flags & PF_R) flags |= PAGE_PRESENT;
@@ -54,7 +55,6 @@ uint64_t load_elf(uint64_t *user_cr3, const char *path) {
         r = map_range_generic(user_cr3, entry->p_vaddr, base, flags, entry->p_memsz);
         if (r < 0) return -13;
         memset(phys_to_virt(base) + entry->p_filesz, 0x00, entry->p_memsz - entry->p_filesz);
-        entry++;
     }
 
     free(p);

@@ -28,6 +28,10 @@ typedef struct file {
     int refcount;
 } file_t;
 
+typedef struct cwd {
+    vnode_t *dir;
+} cwd_t;
+
 typedef struct task_struct {
     uint64_t pid;
     struct interrupt_frame frame;
@@ -37,6 +41,7 @@ typedef struct task_struct {
     uint64_t ticks;
     int state;
     file_t *fds[MAX_FDS];
+    cwd_t current_cwd;
     struct task_struct *next;
     struct task_struct *parent;
 } task_t;
