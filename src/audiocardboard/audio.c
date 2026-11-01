@@ -3,6 +3,8 @@
 
 #include "audiocardboard/audio.h"
 
+extern uint64_t timer_ticks;
+
 int playing = 0;
 
 void write_dsp(uint8_t command)
@@ -36,8 +38,8 @@ void disable_soundblaster()
 
 void setup_soundblaster()
 {
-    reset_sound_blaster();
-    start_sound_blaster();
+    reset_soundblaster();
+    start_soundblaster();
 }
 
 void setup_dma(uint8_t* buff, uint16_t size)
@@ -52,7 +54,7 @@ void setup_dma(uint8_t* buff, uint16_t size)
     outb(0x83, (address >> 16) & 0xFF);
     outb(0x03, (size - 1) & 0xFF);
     outb(0x03, (size - 1) >> 8);
-    outb(0x0A, 0x01)
+    outb(0x0A, 0x01);
 }
 
 void soundblaster_play(uint8_t* buff, uint16_t size)
@@ -60,7 +62,7 @@ void soundblaster_play(uint8_t* buff, uint16_t size)
     playing = 0x01;
     setup_dma(buff, size);
     write_dsp(0x40);
-    write_dsp(256 - (1000000 / 8000); // 11kHz
+    write_dsp(256 - (1000000 / 8000)); // 11kHz
     write_dsp(0x14);
     write_dsp((size - 1) & 0xFF);
     write_dsp((size - 1) >> 8);
@@ -71,6 +73,7 @@ void soundblaster_play(uint8_t* buff, uint16_t size)
     while (timer_ticks < future_tick) {
         asm volatile ("hlt");
     }
+
     playing = 0x00;
 }
 

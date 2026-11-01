@@ -102,8 +102,8 @@ int sys_uname(struct utsname *ptr) {
 
     strcpy(ptr->sysname, "Nikinix");
     strncpy(ptr->nodename, hostname, 64);
-    strcpy(ptr->release, "v0.6");
-    strcpy(ptr->version, "No SIGSEGV so far v0.6");
+    strcpy(ptr->release, "v0.9");
+    strcpy(ptr->version, "No SIGSEGV so far v0.9");
     strcpy(ptr->machine, "x86_64");
     return 0;
 }
