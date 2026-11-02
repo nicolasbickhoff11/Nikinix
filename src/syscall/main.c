@@ -271,8 +271,8 @@ int sys_uname(struct utsname *ptr)
     strncpy(ptr->nodename, hostname, 64);
     ptr->nodename[64] = '\0';
 
-    strcpy(ptr->release, "v0.9");
-    strcpy(ptr->version, "No SIGSEGV so far v0.9");
+    strcpy(ptr->release, "v1.0.0");
+    strcpy(ptr->version, "No SIGSEGV so far v1.0.0");
     strcpy(ptr->machine, "x86_64");
 
     return 0;
