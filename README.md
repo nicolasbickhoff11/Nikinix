@@ -28,7 +28,7 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 - unix-style errno ✅
 - shell ✅
 - syscall instruction ✅
-- OPEN, and File Operations syscalls 🚧
+- OPEN, and File Operations syscalls ✅
 - Scheduler 🚧
 - Fork and Process Operations syscalls ❌
 - SMAP / SMEP ❌
