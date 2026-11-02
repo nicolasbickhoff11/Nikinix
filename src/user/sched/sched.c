@@ -1,29 +1,47 @@
 #include "user/sched/sched.h"
 #include "isr.h"
 #include "errno.h"
+
 #include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 uint64_t pid = 0;
 task_t *current = NULL;
 task_t *start = NULL;
 
-uint64_t pid_alloc() {
+uint64_t pid_alloc(void) {
     return ++pid;
 }
 
 int fd_alloc(file_t *file) {
+    if (!current || !file)
+        return -EINVAL;
+
     for (int i = 0; i < MAX_FDS; i++) {
         if (!current->fds[i]) {
             current->fds[i] = file;
             return i;
         }
     }
+
     return -EMFILE;
 }
 
-int fd_free(int fd)
-{
+file_t *fd_get(int fd) {
+    if (!current)
+        return NULL;
+
+    if (fd < 0 || fd >= MAX_FDS)
+        return NULL;
+
+    return current->fds[fd];
+}
+
+int fd_free(int fd) {
+    if (!current)
+        return -EINVAL;
+
     if (fd < 0 || fd >= MAX_FDS)
         return -EBADF;
 
@@ -44,55 +62,56 @@ int fd_free(int fd)
 }
 
 void scheduler(struct interrupt_frame *frame) {
-    // 1. ANTES DE MUDAR DE TAREFA: Salva o frame da tarefa antiga
-    current->frame = *frame; 
+    if (!frame || !start)
+        return;
 
-    // 2. Se a tarefa antiga ainda estava rodando, ela volta a ficar PRONTA.
-    // Se ela foi bloqueada por sleep/IO, o estado dela NÃO será alterado aqui!
-    if (current->state == STATE_RUNNING) {
-        current->state = STATE_READY;
+    /* Salva o contexto da tarefa atual. */
+    if (current) {
+        current->frame = *frame;
+
+        if (current->state == STATE_RUNNING)
+            current->state = STATE_READY;
     }
 
-    task_t *p = NULL;
-    if (!current->next)
-        p = start;
-    else
-        p = current->next;
+    /* Começa pela próxima tarefa ou pela primeira da lista. */
+    task_t *p = current && current->next
+        ? current->next
+        : start;
 
-    task_t *pivot = p; // Guarda o ponto de início para detectar lista vazia/ocupada
+    task_t *pivot = p;
 
-    for (;;) {
+    do {
         if (p->state == STATE_READY) {
-            // 3. Atualiza o ponteiro global para a nova tarefa
             current = p;
+
             current->ticks = 0;
             current->quantum = QUANTUM_TICKS;
-            
-            // 4. Altera o estado da nova tarefa para RUNNING
-            current->state = STATE_RUNNING; 
+            current->state = STATE_RUNNING;
 
+            /* Troca o espaço de endereçamento, se necessário. */
             if (current->user_cr3) {
-                asm volatile ("mov %0, %%cr3" :: "r"(current->user_cr3) : "memory");
+                asm volatile(
+                    "mov %0, %%cr3"
+                    :
+                    : "r"(current->user_cr3)
+                    : "memory"
+                );
             }
-            
-            // 5. Envia o frame da nova tarefa de volta para o manipulador em assembly
+
+            /* Restaura o contexto da nova tarefa. */
             *frame = current->frame;
-            return; 
+            return;
         }
 
-        // Avança na lista circular
-        if (!p->next) {
-            p = start;
-        } else {
-            p = p->next;
-        }
+        p = p->next ? p->next : start;
 
-        // Se checou todo mundo e ninguém está pronto
-        if (p == pivot) {
-            break;
-        }
+    } while (p != pivot);
+
+    /*
+     * Nenhuma tarefa READY foi encontrada.
+     * O sistema precisa ter uma tarefa idle disponível.
+     */
+    for (;;) {
+        asm volatile("sti; hlt");
     }
-
-    // Fallback caso todas as tarefas estejam bloqueadas
-    asm volatile("sti; hlt");
 }

@@ -19,11 +19,13 @@ void setup_syscall() {
     syscall_table[_NR_read] = _x64_sys_read;
     syscall_table[_NR_sleep] = _x64_sys_sleep;
     syscall_table[_NR_uname] = _x64_sys_uname;
-    syscall_table[_NR_readdir] = _x64_sys_readdir;
+    syscall_table[_NR_getdirentries] = _x64_sys_getdirentries;
     syscall_table[_NR_mkdir] = _x64_sys_mkdir;
     syscall_table[_NR_create] = _x64_sys_create;
     syscall_table[_NR_remove] = _x64_sys_remove;
     syscall_table[_NR_sethostname] = _x64_sys_sethostname;
     syscall_table[_NR_getcwd] = _x64_sys_getcwd;
     syscall_table[_NR_chdir] = _x64_sys_chdir;
+    syscall_table[_NR_open] = _x64_sys_open;
+    syscall_table[_NR_close] = _x64_sys_close;
 }

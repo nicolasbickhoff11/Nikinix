@@ -36,6 +36,7 @@ struct vnode {
     struct vnode *parent;
     mount_t *mnt;
     const char *name;
+    uint64_t size;
 
     void *private;
 };
@@ -48,6 +49,7 @@ struct node_ops {
     ssize_t (*write)(vnode_t *, const void *, size_t, uint64_t);
     ssize_t (*readdir)(vnode_t *dir, dirent_t *entries, size_t max_entries);
     vnode_t *(*resolve)(const char *path);
+    int (*truncate)(vnode_t *, uint64_t);
 };
 
 struct mount {
@@ -73,6 +75,7 @@ int vfs_lookup_path(vnode_t *root, const char *path, vnode_t **result);
 int vfs_remove_path(vnode_t *root, const char *path);
 int vfs_open(const char *name, vnode_t **result);
 vnode_t *vfs_resolve(const char *path);
+int vfs_truncate(vnode_t *node, uint64_t length);
 int vnode_get_path(vnode_t *node, char *buffer, size_t size);
 
 #endif

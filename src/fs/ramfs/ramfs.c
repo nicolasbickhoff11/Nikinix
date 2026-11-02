@@ -1,3 +1,4 @@
+
 #include "fs/ramfs/ramfs.h"
 #include "user/sched/sched.h"
 #include "vfs/vfs.h"
@@ -5,7 +6,6 @@
 #include "string.h"
 #include "print.h"
 #include "errno.h"
-
 
 int ramfs_lookup(
     vnode_t *dir,
@@ -44,13 +44,9 @@ int ramfs_lookup(
             res->mode = entry->mode;
             res->name = entry->name;
             res->inode = entry->inode;
+            res->size = entry->current_data_size;
             res->mnt = dir->mnt;
             res->private = entry;
-
-            /*
-             * O vnode encontrado pertence ao diretório
-             * que realizou o lookup.
-             */
             res->parent = dir;
 
             *result = res;
@@ -61,7 +57,6 @@ int ramfs_lookup(
 
     return -ENOENT;
 }
-
 
 ssize_t ramfs_readdir(
     vnode_t *dir,
@@ -110,7 +105,6 @@ ssize_t ramfs_readdir(
     return (ssize_t)count;
 }
 
-
 int ramfs_create(
     vnode_t *dir,
     const char *name,
@@ -130,9 +124,6 @@ int ramfs_create(
     if (!node)
         return -EIO;
 
-    /*
-     * Evita criar dois objetos com o mesmo nome.
-     */
     for (size_t i = 0;
          i < node->children_count;
          i++) {
@@ -182,38 +173,27 @@ int ramfs_create(
 
     node->children = tmp;
 
-    node->children[
-        node->children_count
-    ] = new_entry;
-
+    node->children[node->children_count] = new_entry;
     node->children_count++;
 
     vnode_t *res = malloc(sizeof(vnode_t));
 
     if (!res) {
-        /*
-         * O objeto já foi inserido no diretório.
-         * Por enquanto mantemos a entrada.
-         */
         return -ENOMEM;
     }
 
     res->mode = new_entry->mode;
     res->inode = new_entry->inode;
+    res->size = new_entry->current_data_size;
     res->mnt = dir->mnt;
     res->private = new_entry;
     res->name = new_entry->name;
-
-    /*
-     * O pai é o diretório onde o objeto foi criado.
-     */
     res->parent = dir;
 
     *result = res;
 
     return 0;
 }
-
 
 int ramfs_remove(
     vnode_t *dir,
@@ -241,10 +221,6 @@ int ramfs_remove(
 
         if (strcmp(entry->name, name) == 0) {
 
-            /*
-             * Não permite remover diretório
-             * que ainda possui filhos.
-             */
             if (S_ISDIR(entry->mode) &&
                 entry->children_count > 0)
                 return -EBUSY;
@@ -261,7 +237,6 @@ int ramfs_remove(
 
     return -ENOENT;
 }
-
 
 ssize_t ramfs_read(
     vnode_t *file,
@@ -280,14 +255,19 @@ ssize_t ramfs_read(
     if (!S_ISREG(file->mode))
         return -EINVAL;
 
+    /*
+     * Atualiza o tamanho do vnode a partir
+     * do tamanho real armazenado no RAMFS.
+     */
+    file->size = node->current_data_size;
+
     if (count == 0)
         return 0;
 
     if (offset >= node->current_data_size)
         return 0;
 
-    uint64_t size =
-        node->current_data_size - offset;
+    uint64_t size = node->current_data_size - offset;
 
     if (size > count)
         size = count;
@@ -300,7 +280,6 @@ ssize_t ramfs_read(
 
     return (ssize_t)size;
 }
-
 
 ssize_t ramfs_write(
     vnode_t *file,
@@ -322,9 +301,6 @@ ssize_t ramfs_write(
     if (count == 0)
         return 0;
 
-    /*
-     * Verifica overflow de offset + count.
-     */
     if (offset > UINT64_MAX - count)
         return -EOVERFLOW;
 
@@ -332,11 +308,9 @@ ssize_t ramfs_write(
 
     if (new_size > node->current_data_size) {
 
-        uint64_t old_size =
-            node->current_data_size;
+        uint64_t old_size = node->current_data_size;
 
-        void *new_data =
-            realloc(node->data, new_size);
+        void *new_data = realloc(node->data, new_size);
 
         if (!new_data)
             return -ENOMEM;
@@ -344,7 +318,6 @@ ssize_t ramfs_write(
         node->data = new_data;
 
         if (new_size > old_size) {
-
             memset(
                 (uint8_t *)node->data + old_size,
                 0,
@@ -361,18 +334,73 @@ ssize_t ramfs_write(
         count
     );
 
+    /*
+     * Atualiza o tamanho do vnode.
+     */
+    file->size = node->current_data_size;
+
     return (ssize_t)count;
 }
 
+int ramfs_truncate(
+    vnode_t *file,
+    uint64_t length
+) {
+    if (!file)
+        return -EFAULT;
+
+    if (!S_ISREG(file->mode))
+        return -EINVAL;
+
+    ramfs_node_t *node = file->private;
+
+    if (!node)
+        return -EIO;
+
+    uint64_t old_size = node->current_data_size;
+
+    if (length == old_size) {
+        file->size = node->current_data_size;
+        return 0;
+    }
+
+    if (length == 0) {
+        free(node->data);
+
+        node->data = NULL;
+        node->current_data_size = 0;
+        file->size = 0;
+
+        return 0;
+    }
+
+    void *new_data = realloc(node->data, length);
+
+    if (!new_data)
+        return -ENOMEM;
+
+    node->data = new_data;
+
+    if (length > old_size) {
+        memset(
+            (uint8_t *)node->data + old_size,
+            0,
+            length - old_size
+        );
+    }
+
+    node->current_data_size = length;
+    file->size = node->current_data_size;
+
+    return 0;
+}
+
+extern uint64_t hhdm_offset;
+
 vnode_t *ramfs_resolve(const char *path) {
-    if (!path || !*path || !vfs_root)
+    if (!path || !(path > 0x400000 && path < 0x7fffffffffff || path > hhdm_offset) || !*path || !vfs_root)
         return NULL;
 
-    /*
-     * Caminhos absolutos começam em vfs_root.
-     * Caminhos relativos começam no CWD do processo;
-     * se ainda não houver CWD, começam em vfs_root.
-     */
     vnode_t *walk;
 
     if (path[0] == '/') {
@@ -384,6 +412,7 @@ vnode_t *ramfs_resolve(const char *path) {
     }
 
     while (*path) {
+
         while (*path == '/')
             path++;
 
@@ -394,6 +423,7 @@ vnode_t *ramfs_resolve(const char *path) {
         size_t len = 0;
 
         while (*path && *path != '/') {
+
             if (len >= sizeof(component) - 1)
                 return NULL;
 
@@ -418,7 +448,12 @@ vnode_t *ramfs_resolve(const char *path) {
             return NULL;
 
         vnode_t *next = NULL;
-        int ret = ramfs_lookup(walk, component, &next);
+
+        int ret = ramfs_lookup(
+            walk,
+            component,
+            &next
+        );
 
         if (ret < 0 || !next)
             return NULL;
@@ -430,18 +465,18 @@ vnode_t *ramfs_resolve(const char *path) {
 }
 
 node_ops_t ramfs_ops = {
-    .create  = ramfs_create,
-    .lookup  = ramfs_lookup,
-    .remove  = ramfs_remove,
-    .read    = ramfs_read,
-    .write   = ramfs_write,
-    .readdir = ramfs_readdir,
-    .resolve = ramfs_resolve
+    .create   = ramfs_create,
+    .lookup   = ramfs_lookup,
+    .remove   = ramfs_remove,
+    .read     = ramfs_read,
+    .write    = ramfs_write,
+    .readdir  = ramfs_readdir,
+    .resolve  = ramfs_resolve,
+    .truncate = ramfs_truncate
 };
 
+mount_t *create_ramfs(void) {
 
-mount_t *create_ramfs(void)
-{
     ramfs_node_t *root_node =
         malloc(sizeof(ramfs_node_t));
 
@@ -475,6 +510,7 @@ mount_t *create_ramfs(void)
 
     root_vfs->mode = root_node->mode;
     root_vfs->inode = root_node->inode;
+    root_vfs->size = root_node->current_data_size;
     root_vfs->mnt = NULL;
     root_vfs->private = root_node;
     root_vfs->parent = NULL;

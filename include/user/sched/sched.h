@@ -20,12 +20,20 @@
 #define FILE_DIR 1
 #define FILE_CONSOLE 2
 
+typedef enum {
+    CONSOLE_NONE = 0,
+    CONSOLE_STDIN = 1,
+    CONSOLE_STDOUT = 2,
+    CONSOLE_STDERR = 3
+} console_type_t;
+
 typedef struct file {
     vnode_t *vnode;
     uint64_t offset;
     int flags;
     int type;
     int refcount;
+    console_type_t console_type; // IF the file_t is I/O Consoles
 } file_t;
 
 typedef struct cwd {
@@ -50,5 +58,9 @@ extern task_t *current;
 extern task_t *start;
 
 void scheduler(struct interrupt_frame *frame);
+
+int fd_alloc(file_t *file);
+file_t *fd_get(int fd);
+int fd_free(int fd);
 
 #endif

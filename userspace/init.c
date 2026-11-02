@@ -1,18 +1,17 @@
+
 #include <stdint.h>
 #include <stddef.h>
 
 /*
  * Nikinix syscall ABI — x86_64
  *
- * RAX = número do syscall
- * RDI = argumento 1
- * RSI = argumento 2
- * RDX = argumento 3
- * R10 = argumento 4
- * R8  = argumento 5
- * R9  = argumento 6
- *
- * Retorno em RAX.
+ * RAX = syscall number
+ * RDI = argument 1
+ * RSI = argument 2
+ * RDX = argument 3
+ * R10 = argument 4
+ * R8  = argument 5
+ * R9  = argument 6
  */
 
 static inline long __nikinix_call(
@@ -26,32 +25,26 @@ static inline long __nikinix_call(
 {
     long ret;
 
-    /*
-     * Força o compilador a usar estritamente a convenção de chamada do x86_64.
-     * Vinculamos as variáveis locais diretamente aos registradores físicos.
-     */
     register long r_ax __asm__("rax") = number;
     register uintptr_t r_di __asm__("rdi") = a1;
     register uintptr_t r_si __asm__("rsi") = a2;
     register uintptr_t r_dx __asm__("rdx") = a3;
-    register uintptr_t r_10 __asm__("r10") = a4; /* Syscall usa R10 no lugar de RCX */
+    register uintptr_t r_10 __asm__("r10") = a4;
     register uintptr_t r_8  __asm__("r8")  = a5;
     register uintptr_t r_9  __asm__("r9")  = a6;
 
     __asm__ volatile (
         "syscall"
         : "=a"(ret)
-        : "a"(r_ax), "D"(r_di), "S"(r_si), "d"(r_dx), "r"(r_10), "r"(r_8), "r"(r_9)
+        : "a"(r_ax), "D"(r_di), "S"(r_si),
+          "d"(r_dx), "r"(r_10), "r"(r_8), "r"(r_9)
         : "rcx", "r11", "memory"
     );
 
     return ret;
 }
 
-/*
- * Wrappers por quantidade de argumentos.
- * Argumentos não utilizados são preenchidos com zero.
- */
+/* Syscall argument wrappers */
 
 #define NIKINIX_SC0(n) \
     __nikinix_call((long)(n), 0, 0, 0, 0, 0, 0)
@@ -65,8 +58,7 @@ static inline long __nikinix_call(
 
 #define NIKINIX_SC3(n, a1, a2, a3) \
     __nikinix_call((long)(n), (uintptr_t)(a1), \
-                   (uintptr_t)(a2), (uintptr_t)(a3), \
-                   0, 0, 0)
+                   (uintptr_t)(a2), (uintptr_t)(a3), 0, 0, 0)
 
 #define NIKINIX_SC4(n, a1, a2, a3, a4) \
     __nikinix_call((long)(n), (uintptr_t)(a1), \
@@ -92,13 +84,13 @@ static inline long __nikinix_call(
         NIKINIX_SC3, NIKINIX_SC2, NIKINIX_SC1, \
         NIKINIX_SC0)(__VA_ARGS__)
 
-/* Strings */
+/* String functions */
 
 size_t strlen(const char *p)
 {
     size_t i = 0;
 
-    if (p == NULL)
+    if (!p)
         return 0;
 
     while (p[i] != '\0')
@@ -130,7 +122,7 @@ int strncmp(const char *s1, const char *s2, size_t n)
     return (unsigned char)s1[i] - (unsigned char)s2[i];
 }
 
-/* uname ABI */
+/* Uname ABI */
 
 struct utsname {
     char sysname[65];
@@ -184,6 +176,15 @@ typedef struct dirent {
 #define EMLINK         31
 #define EPIPE          32
 
+/* Open flags: must match kernel */
+
+#define O_RDONLY  0x00
+#define O_WRONLY  0x01
+#define O_RDWR    0x02
+#define O_CREATE  0x40
+#define O_TRUNC   0x200
+#define O_APPEND  0x400
+
 /* Output helpers */
 
 static void puts_fd1(const char *s)
@@ -191,7 +192,69 @@ static void puts_fd1(const char *s)
     syscall(0, 1, s, strlen(s));
 }
 
-/* Shell */
+static void write_all(int fd, const void *buffer, size_t size)
+{
+    const char *p = buffer;
+
+    while (size > 0) {
+        long n = syscall(0, fd, p, size);
+
+        if (n <= 0)
+            return;
+
+        p += n;
+        size -= (size_t)n;
+    }
+}
+
+/* File operation wrappers */
+
+static inline int open(
+    const char *path,
+    int flags,
+    uint32_t mode)
+{
+    return (int)syscall(11, path, flags, mode);
+}
+
+static inline int close(int fd)
+{
+    return (int)syscall(12, fd);
+}
+
+static inline size_t write(int fd, const void *buf, size_t len) {
+    return (size_t)syscall(0, fd, buf, len);
+}
+
+void print_decimal64(int64_t n)
+{
+    char buf[21];
+    int i = 0;
+
+    uint64_t value;
+
+    if (n < 0) {
+        write(1, "-", 1);
+        value = (uint64_t)(-(n + 1)) + 1;
+    } else {
+        value = (uint64_t)n;
+    }
+
+    if (value == 0) {
+        write(1, "0", 1);
+        return;
+    }
+
+    while (value > 0) {
+        buf[i++] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    while (i > 0)
+        write(1, &buf[--i], 1);
+}
+
+/* Error helpers */
 
 static void print_error_path(
     const char *command,
@@ -202,6 +265,87 @@ static void print_error_path(
     puts_fd1(path);
     puts_fd1(message);
 }
+
+void print_decimal(int n)
+{
+    char buf[12];
+    int i = 0;
+
+    if (n == 0) {
+        write(1, "0", 1);
+        return;
+    }
+
+    if (n < 0) {
+        write(1, "-", 1);
+        n = -n;
+    }
+
+    while (n > 0) {
+        buf[i++] = '0' + (n % 10);
+        n /= 10;
+    }
+
+    while (i > 0)
+        write(1, &buf[--i], 1);
+}
+
+/* CAT */
+
+static void command_cat(const char *path)
+{
+    if (!path || !*path) {
+        puts_fd1("cat: missing operand\n");
+        return;
+    }
+
+    int fd = open(path, O_RDONLY, 0);
+
+    if (fd < 0) {
+        puts_fd1("cat: ");
+        puts_fd1(path);
+
+        if (fd == -ENOENT)
+            puts_fd1(": no such file\n");
+        else if (fd == -EACCES)
+            puts_fd1(": permission denied\n");
+        else if (fd == -EISDIR)
+            puts_fd1(": is a directory\n");
+        else if (fd == -EBADF)
+            puts_fd1(": invalid file descriptor\n");
+        else
+            puts_fd1(": cannot open file\n");
+
+        return;
+    }
+
+    char buffer[256];
+
+    for (;;) {
+        long n = syscall(1, fd, buffer, sizeof(buffer));
+
+        if (n < 0) {
+            puts_fd1("cat: read error\n");
+            // print_decimal64(n);
+            break;
+        }
+
+        if (n == 0)
+            break;
+
+        if ((size_t)n > sizeof(buffer)) {
+            puts_fd1("cat: invalid read result\n");
+            break;
+        }
+
+        write_all(1, buffer, (size_t)n);
+    }
+
+    if (close(fd) < 0)
+        puts_fd1("cat: close error\n");
+}
+
+/* SHELL */
 
 int main(void)
 {
@@ -226,7 +370,6 @@ int main(void)
         puts_fd1(path);
         puts_fd1("# ");
 
-
         long i = syscall(1, 0, buffer, sizeof(buffer) - 1);
 
         if (i == -EINTR)
@@ -237,9 +380,6 @@ int main(void)
             continue;
         }
 
-        /*
-         * Não sai do shell quando read retorna 0.
-         */
         if (i == 0) {
             puts_fd1("\n");
             continue;
@@ -264,12 +404,14 @@ int main(void)
         if (buffer[0] == '\0')
             continue;
 
+        /* EXIT */
+
         if (strcmp(buffer, "exit") == 0) {
             puts_fd1("bye\n");
             break;
         }
 
-        /* uname */
+        /* UNAME */
 
         if (strcmp(buffer, "uname") == 0) {
             struct utsname uts = {0};
@@ -300,7 +442,8 @@ int main(void)
 
             continue;
         }
-        /* cwd */
+
+        /* PWD */
 
         if (strcmp(buffer, "pwd") == 0) {
             char path[256] = {0};
@@ -320,7 +463,7 @@ int main(void)
             continue;
         }
 
-        /* cd */
+        /* CD */
 
         if (strcmp(buffer, "cd") == 0 ||
             strncmp(buffer, "cd ", 3) == 0) {
@@ -343,19 +486,18 @@ int main(void)
             long r = syscall(10, path);
 
             if (r < 0) {
-                if (r == -ENOENT) {
+                if (r == -ENOENT)
                     print_error_path("cd: ", path,
                                      ": no such directory\n");
-                } else if (r == -ENOTDIR) {
+                else if (r == -ENOTDIR)
                     print_error_path("cd: ", path,
                                      ": not a directory\n");
-                } else if (r == -EACCES) {
+                else if (r == -EACCES)
                     print_error_path("cd: ", path,
                                      ": permission denied\n");
-                } else {
+                else
                     print_error_path("cd: ", path,
                                      ": cannot change directory\n");
-                }
 
                 continue;
             }
@@ -363,38 +505,38 @@ int main(void)
             continue;
         }
 
-        /* sethostname */
+        /* SETHOSTNAME */
 
-if (strcmp(buffer, "sethostname") == 0 ||
-    strncmp(buffer, "sethostname ", 12) == 0) {
+        if (strcmp(buffer, "sethostname") == 0 ||
+            strncmp(buffer, "sethostname ", 12) == 0) {
 
-    if (strcmp(buffer, "sethostname") == 0) {
-        puts_fd1("usage: sethostname <hostname>\n");
-        continue;
-    }
+            if (strcmp(buffer, "sethostname") == 0) {
+                puts_fd1("usage: sethostname <hostname>\n");
+                continue;
+            }
 
-    char *hostname = buffer + 12;
+            char *hostname = buffer + 12;
 
-    while (*hostname == ' ')
-        hostname++;
+            while (*hostname == ' ')
+                hostname++;
 
-    if (*hostname == '\0') {
-        puts_fd1("sethostname: missing hostname\n");
-        continue;
-    }
+            if (*hostname == '\0') {
+                puts_fd1("sethostname: missing hostname\n");
+                continue;
+            }
 
-    long r = syscall(8, hostname);
+            long r = syscall(8, hostname);
 
-    if (r < 0) {
-        puts_fd1("sethostname: failed\n");
-        continue;
-    }
+            if (r < 0) {
+                puts_fd1("sethostname: failed\n");
+                continue;
+            }
 
-    puts_fd1("hostname updated\n");
-    continue;
-}
+            puts_fd1("hostname updated\n");
+            continue;
+        }
 
-        /* ls */
+        /* LS */
 
         if (strcmp(buffer, "ls") == 0 ||
             strncmp(buffer, "ls ", 3) == 0) {
@@ -421,15 +563,14 @@ if (strcmp(buffer, "sethostname") == 0 ||
                 puts_fd1("ls: ");
                 puts_fd1(path);
 
-                if (r == -EINVAL) {
+                if (r == -EINVAL)
                     puts_fd1(": invalid argument\n");
-                } else if (r == -ENOTDIR) {
+                else if (r == -ENOTDIR)
                     puts_fd1(": not a directory\n");
-                } else if (r == -EIO) {
+                else if (r == -EIO)
                     puts_fd1(": filesystem error\n");
-                } else {
+                else
                     puts_fd1(": cannot open directory\n");
-                }
 
                 continue;
             }
@@ -455,7 +596,7 @@ if (strcmp(buffer, "sethostname") == 0 ||
             continue;
         }
 
-        /* mkdir */
+        /* MKDIR */
 
         if (strcmp(buffer, "mkdir") == 0 ||
             strncmp(buffer, "mkdir ", 6) == 0) {
@@ -478,28 +619,27 @@ if (strcmp(buffer, "sethostname") == 0 ||
             long r = syscall(5, path);
 
             if (r < 0) {
-                if (r == -EEXIST) {
+                if (r == -EEXIST)
                     print_error_path("mkdir: ", path,
                                      ": file exists\n");
-                } else if (r == -ENOENT) {
+                else if (r == -ENOENT)
                     print_error_path("mkdir: ", path,
                                      ": no such file or directory\n");
-                } else if (r == -ENOTDIR) {
+                else if (r == -ENOTDIR)
                     print_error_path("mkdir: ", path,
                                      ": not a directory\n");
-                } else if (r == -EACCES) {
+                else if (r == -EACCES)
                     print_error_path("mkdir: ", path,
                                      ": permission denied\n");
-                } else {
+                else
                     print_error_path("mkdir: ", path,
                                      ": cannot create directory\n");
-                }
             }
 
             continue;
         }
 
-        /* create */
+        /* CREATE */
 
         if (strcmp(buffer, "create") == 0 ||
             strncmp(buffer, "create ", 7) == 0) {
@@ -522,28 +662,27 @@ if (strcmp(buffer, "sethostname") == 0 ||
             long r = syscall(6, path);
 
             if (r < 0) {
-                if (r == -EEXIST) {
+                if (r == -EEXIST)
                     print_error_path("create: ", path,
                                      ": file exists\n");
-                } else if (r == -ENOENT) {
+                else if (r == -ENOENT)
                     print_error_path("create: ", path,
                                      ": no such file or directory\n");
-                } else if (r == -ENOTDIR) {
+                else if (r == -ENOTDIR)
                     print_error_path("create: ", path,
                                      ": not a directory\n");
-                } else if (r == -EACCES) {
+                else if (r == -EACCES)
                     print_error_path("create: ", path,
                                      ": permission denied\n");
-                } else {
+                else
                     print_error_path("create: ", path,
                                      ": cannot create file\n");
-                }
             }
 
             continue;
         }
 
-        /* remove */
+        /* REMOVE */
 
         if (strcmp(buffer, "remove") == 0 ||
             strncmp(buffer, "remove ", 7) == 0) {
@@ -566,23 +705,48 @@ if (strcmp(buffer, "sethostname") == 0 ||
             long r = syscall(7, path);
 
             if (r < 0) {
-                if (r == -ENOENT) {
+                if (r == -ENOENT)
                     print_error_path("remove: ", path,
                                      ": no such file or directory\n");
-                } else if (r == -ENOTDIR) {
+                else if (r == -ENOTDIR)
                     print_error_path("remove: ", path,
                                      ": not a directory\n");
-                } else if (r == -EACCES) {
+                else if (r == -EACCES)
                     print_error_path("remove: ", path,
                                      ": permission denied\n");
-                } else {
+                else
                     print_error_path("remove: ", path,
                                      ": cannot remove\n");
-                }
             }
 
             continue;
         }
+
+        /* CAT */
+
+        if (strcmp(buffer, "cat") == 0 ||
+            strncmp(buffer, "cat ", 4) == 0) {
+
+            if (strcmp(buffer, "cat") == 0) {
+                puts_fd1("cat: missing operand\n");
+                continue;
+            }
+
+            char *path = buffer + 4;
+
+            while (*path == ' ')
+                path++;
+
+            if (*path == '\0') {
+                puts_fd1("cat: missing operand\n");
+                continue;
+            }
+
+            command_cat(path);
+            continue;
+        }
+
+        /* COMMAND NOT FOUND */
 
         puts_fd1("nikinix: command not found: ");
         puts_fd1(buffer);

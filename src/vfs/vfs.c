@@ -342,6 +342,55 @@ int vfs_create_path(
     return 0;
 }
 
+#include "user/sched/sched.h"
+
+/*
+ * ============================================================
+ * VFS CREATE USER PATH
+ * ============================================================
+ *
+ * Cria um objeto usando o CWD do processo atual.
+ *
+ * Caminhos relativos:
+ *   teste.txt
+ *   pasta/teste.txt
+ *
+ * Caminhos absolutos:
+ *   /teste.txt
+ *   /tmp/teste.txt
+ */
+int vfs_create_user_path(
+    const char *path,
+    mode_t mode,
+    vnode_t **result
+) {
+    if (!path || !result)
+        return -EFAULT;
+
+    *result = NULL;
+
+    if (!vfs_root)
+        return -ENODEV;
+
+    vnode_t *start = vfs_root;
+
+    /*
+     * Caminhos relativos começam no CWD.
+     */
+    if (path[0] != '/') {
+
+        if (current && current->current_cwd.dir)
+            start = current->current_cwd.dir;
+    }
+
+    return vfs_create_path(
+        start,
+        path,
+        mode,
+        result
+    );
+}
+
 
 /*
  * ============================================================
@@ -763,6 +812,23 @@ vnode_t *vfs_resolve(const char *path) {
         return ERR_PTR(-ENOSYS);
 
     return vfs_root->mnt->ops->resolve(path);
+}
+
+int vfs_truncate(vnode_t *node, uint64_t length)
+{
+    if (!node)
+        return -EINVAL;
+
+    if (!S_ISREG(node->mode))
+        return -EINVAL;
+
+    if (!node->mnt || !node->mnt->ops)
+        return -ENODEV;
+
+    if (!node->mnt->ops->truncate)
+        return -ENOSYS;
+
+    return node->mnt->ops->truncate(node, length);
 }
 
 /*
