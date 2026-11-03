@@ -1,8 +1,5 @@
 #include <stdint.h>
 
-uint32_t fb;
-uint32_t pitch;
-
 void get_fb();
 void get_pitch();
 void put_pixel_buff(uint32_t* buff, int x, int y, int w, int h, uint32_t color);
