@@ -1,5 +1,8 @@
 #include <stdint.h>
 
+// h = host
+// n = network
+
 uint16_t htons(uint16_t hostshort);
 uint16_t ntohs(uint16_t networkshort);
 
