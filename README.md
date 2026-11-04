@@ -19,6 +19,7 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 - TSC ✅
 - Type 1 and 0 SMBIOS ✅
 - Math library ✅
+- Network driver ✅
 - PCIe ✅
 - CMOS functions ✅
 - MSR ✅
