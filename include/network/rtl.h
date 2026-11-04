@@ -11,7 +11,7 @@ void send_packet
 
 void recieve_packet();
 
-void handle_reply(ICMPHeader* icmpHdr);
+void handle_reply(ICMPHeader* icmpHdr, int length);
 void sendping(const char* dstIp);
 
 uint32_t rtl_find_device();
