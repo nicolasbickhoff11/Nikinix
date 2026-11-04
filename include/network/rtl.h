@@ -12,7 +12,7 @@ void send_packet
 void recieve_packet();
 
 void handle_reply(ICMPHeader* icmpHdr);
-void send_ping(const char* dstIp);
+void sendping(const char* dstIp);
 
 uint32_t rtl_find_device();
 uint8_t* get_mac();
