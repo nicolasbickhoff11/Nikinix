@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#define RGB(r, g, b) ((uint32_t)(((uint8_t)(r)|((uint16_t)((uint8_t)(g))<<8))|(((uint32_t)(uint8_t)(b))<<16)))
+
 void get_fb();
 void get_pitch();
 void put_pixel_buff(uint32_t* buff, int x, int y, int w, int h, uint32_t color);
