@@ -1,8 +1,7 @@
 #include <stdint.h>
 #include "boolean.h"
 #include "string.h"
-// Where is netinclude.h?
-// #include "netinclude.h"
+#include "network/netinclude.h"
 
 ARPEntry arpTable[ARP_TABLE_SIZE];
 int arpTableSize = 0x00;
