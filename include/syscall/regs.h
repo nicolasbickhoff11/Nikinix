@@ -41,6 +41,8 @@ struct user_regs {
     uint64_t r14;
     uint64_t r15;
 
+    uint64_t user_rsp;
+
     //uint64_t rip;
     //uint64_t cs;
     //uint64_t rflags;

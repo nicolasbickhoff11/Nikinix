@@ -9,6 +9,10 @@
 #include "pmm.h"
 #include "print.h"
 #include "msr.h"
+#include "malloc.h"
+#include "tss.h"
+
+extern struct tss_entry_struct tss;
 
 
 /*uint8_t code[] = {
@@ -60,7 +64,7 @@
 
 uint64_t *current_user_cr3 = 0;
 
-
+__attribute__((noreturn))
 void init_userspace()
 {
     //kprintf("A\n");
@@ -136,13 +140,14 @@ uint64_t stack_phys = bitmap_alloc(16);
     kprintf("RIP: 0x%lx\n", rip);
     kprintf("LOADING init (\"/init\")!\n");
 
-    task_t *task = phys_to_virt(malloc(sizeof(*task)));
+    task_t *task = malloc(sizeof(*task));
     if (task) {
         *task = (task_t){0};
         current = task;
         start = task;
+        task->pid = pid_alloc();
         task->frame = (struct interrupt_frame){0};
-        task->kernel_rsp = phys_to_virt(bitmap_alloc(4));
+        task->kernel_rsp = phys_to_virt(bitmap_alloc(4)) + 16384;
         task->frame.rip = rip;
         task->frame.rsp = stack_top;
         task->user_cr3 = cr3_phys;
@@ -152,7 +157,8 @@ uint64_t stack_phys = bitmap_alloc(16);
         task->next = NULL;
         task->parent = NULL;
         task->current_cwd.dir = vfs_root;
-        file_t *fd0 = phys_to_virt(bitmap_alloc(sizeof(*fd0) / 4));
+        task->exit_status = 0;
+        file_t *fd0 = malloc(sizeof(*fd0));
         fd0->vnode = NULL;
         fd0->offset = 0;
         fd0->flags = 2;
@@ -160,7 +166,7 @@ uint64_t stack_phys = bitmap_alloc(16);
         fd0->refcount = 1;
         fd0->console_type = CONSOLE_STDIN;
         fd_alloc(fd0);
-        file_t *fd1 = phys_to_virt(malloc(sizeof(*fd1) / 4));
+        file_t *fd1 = malloc(sizeof(*fd1));
         fd1->vnode = NULL;
         fd1->offset = 0;
         fd1->flags = 2;
@@ -168,20 +174,24 @@ uint64_t stack_phys = bitmap_alloc(16);
         fd1->refcount = 1;
         fd1->console_type = CONSOLE_STDOUT;
         fd_alloc(fd1);
-        file_t *fd2 = phys_to_virt(malloc(sizeof(*fd2)));
+        file_t *fd2 = malloc(sizeof(*fd2));
         fd2->vnode = NULL;
         fd2->offset = 0;
         fd2->flags = 2;
         fd2->type = FILE_CONSOLE;
         fd2->refcount = 1;
         fd2->console_type = CONSOLE_STDERR;
+        tss.rsp0 = current->kernel_rsp;
         fd_alloc(fd2);
     }
 
     clear_screen();
 
+    asm volatile("cli" ::: "memory");
+
+    preemptive_enable();
+
     asm volatile(
-        "cli\n"
 
         "mov %0, %%cr3\n"
 

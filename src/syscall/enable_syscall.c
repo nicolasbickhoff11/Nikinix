@@ -10,7 +10,7 @@ void setup_syscall() {
     efer |= EFER_SCE;
     wrmsr(IA32_EFER, efer);
     uint64_t star = rdmsr(IA32_STAR);
-    star &= ~0xFFFFFFFFFFFFFFFFULL;
+    star = 0;
     star |= ((uint64_t)0x13 << 48) | ((uint64_t)0x08 << 32);
     wrmsr(IA32_STAR, star);
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
@@ -21,11 +21,16 @@ void setup_syscall() {
     syscall_table[_NR_uname] = _x64_sys_uname;
     syscall_table[_NR_getdirentries] = _x64_sys_getdirentries;
     syscall_table[_NR_mkdir] = _x64_sys_mkdir;
-    syscall_table[_NR_create] = _x64_sys_create;
-    syscall_table[_NR_remove] = _x64_sys_remove;
+    syscall_table[_NR_creat] = _x64_sys_creat;
+    syscall_table[_NR_rmdir] = _x64_sys_rmdir;
     syscall_table[_NR_sethostname] = _x64_sys_sethostname;
     syscall_table[_NR_getcwd] = _x64_sys_getcwd;
     syscall_table[_NR_chdir] = _x64_sys_chdir;
     syscall_table[_NR_open] = _x64_sys_open;
     syscall_table[_NR_close] = _x64_sys_close;
+    syscall_table[_NR_unlink] = _x64_sys_unlink;
+    syscall_table[_NR_fork] = _x64_sys_fork;
+    syscall_table[_NR_waitpid] = _x64_sys_waitpid;
+    syscall_table[_NR_exit] = _x64_sys_exit;
+    syscall_table[_NR_getpid] = _x64_sys_getpid;
 }

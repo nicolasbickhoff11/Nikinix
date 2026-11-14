@@ -42,6 +42,7 @@ extern void isr_ud();
 extern void syscall_entry();
 extern void isr_breakpoint();
 extern void isr_double_fault();
+extern void isr_yield();
 
 uint64_t framebuffer        = 0;
 uint32_t framebuffer_height = 0;
@@ -325,6 +326,7 @@ void kmain(void) {
     //set_idt_entry((uint64_t)syscall_entry, 0x80, 0x08, 0x00, 0xEE);
     set_idt_entry((uint64_t)isr_breakpoint, 0x03, 0x08, 0x00, 0xEF);
     set_idt_entry((uint64_t)isr_double_fault, 0x08, 0x08, 0x00, 0x8E);
+    set_idt_entry((uint64_t)isr_yield, 0x81, 0x08, 0x00, 0x8E);
 
     kprintf("[LOG] Loading IDT....\n");
     load_idt();

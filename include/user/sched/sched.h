@@ -12,7 +12,8 @@
 #define STATE_RUNNING 1
 #define STATE_STOPPED 2
 #define STATE_WAITING 3
-#define STATE_DEAD 4
+#define STATE_ZOMBIE 4
+#define STATE_DEAD 5
 
 #define MAX_FDS 256
 
@@ -48,15 +49,37 @@ typedef struct task_struct {
     uint64_t quantum;
     uint64_t ticks;
     int state;
+    int exit_status;
+    int waiting_pid;
     file_t *fds[MAX_FDS];
     cwd_t current_cwd;
     struct task_struct *next;
     struct task_struct *parent;
+    struct task_struct **childs;
+    uint64_t child_count;
 } task_t;
 
 extern task_t *current;
 extern task_t *start;
 
+_Static_assert(
+    offsetof(task_t, kernel_rsp) == 0xA8,
+    "Offset de kernel_rsp incorreto!"
+);
+
+uint64_t pid_alloc(void);
+
+task_t *get_task(int pid);
+
+int reap_process(uint64_t pid, int *exit_status);
+
+int scheduler_waitpid(uint64_t pid, int *status, int options);
+
+__attribute__((noreturn))
+void scheduler_proc_exit(int error_code);
+
+int scheduler_remove_task(task_t *task);
+void wake_up(task_t *task);
 void scheduler(struct interrupt_frame *frame);
 
 int fd_alloc(file_t *file);

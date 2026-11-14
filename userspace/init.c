@@ -175,6 +175,7 @@ typedef struct dirent {
 #define EROFS          30
 #define EMLINK         31
 #define EPIPE          32
+#define ENOTEMPTY      39
 
 /* Open flags: must match kernel */
 
@@ -252,6 +253,85 @@ void print_decimal64(int64_t n)
 
     while (i > 0)
         write(1, &buf[--i], 1);
+}
+
+#define _NR_fork   14
+#define _NR_waitpid 15
+#define _NR_exit   16
+#define _NR_getpid 17
+
+static void command_forktest(void) {
+    puts_fd1("[FORKTEST] Starting...\n");
+
+    long parent_pid = syscall(_NR_getpid);
+
+    puts_fd1("[PARENT] PID: ");
+    print_decimal64(parent_pid);
+    puts_fd1("\n");
+
+    long child_pid = syscall(_NR_fork);
+
+    if (child_pid < 0) {
+        puts_fd1("[PARENT] fork failed: ");
+        print_decimal64(child_pid);
+        puts_fd1("\n");
+        return;
+    }
+
+    /* CHILD */
+    if (child_pid == 0) {
+        long my_pid = syscall(_NR_getpid);
+
+        puts_fd1("[CHILD] Hello! I am the child!\n");
+
+        puts_fd1("[CHILD] My PID: ");
+        print_decimal64(my_pid);
+        puts_fd1("\n");
+
+        puts_fd1("[CHILD] Exiting with code 42...\n");
+
+        syscall(_NR_exit, 42);
+
+        for (;;)
+            asm volatile("hlt");
+    }
+
+    /* PARENT */
+    puts_fd1("[PARENT] Child created! PID: ");
+    print_decimal64(child_pid);
+    puts_fd1("\n");
+
+    puts_fd1("[PARENT] Waiting for child...\n");
+
+    int status = 0;
+
+    long result = syscall(
+        _NR_waitpid,
+        child_pid,
+        &status,
+        0
+    );
+
+    if (result < 0) {
+        puts_fd1("[PARENT] waitpid failed: ");
+        print_decimal64(result);
+        puts_fd1("\n");
+        return;
+    }
+
+    puts_fd1("[PARENT] Child collected!\n");
+
+    puts_fd1("[PARENT] waitpid returned: ");
+    print_decimal64(result);
+    puts_fd1("\n");
+
+    puts_fd1("[PARENT] Raw status: ");
+    print_decimal(status);
+    puts_fd1("\n");
+
+    puts_fd1("[PARENT] Exit code: ");
+    print_decimal((status >> 8) & 0xFF);
+    puts_fd1("\n");
 }
 
 /* Error helpers */
@@ -443,6 +523,11 @@ int main(void)
             continue;
         }
 
+        if (strcmp(buffer, "forktest") == 0) {
+            command_forktest();
+            continue;
+        }
+
         /* PWD */
 
         if (strcmp(buffer, "pwd") == 0) {
@@ -525,7 +610,7 @@ int main(void)
                 continue;
             }
 
-            long r = syscall(8, hostname);
+            long r = syscall(8, hostname, strlen(hostname));
 
             if (r < 0) {
                 puts_fd1("sethostname: failed\n");
@@ -682,13 +767,56 @@ int main(void)
             continue;
         }
 
-        /* REMOVE */
+        /* RMDIR */
 
-        if (strcmp(buffer, "remove") == 0 ||
-            strncmp(buffer, "remove ", 7) == 0) {
+        if (strcmp(buffer, "rmdir") == 0 ||
+            strncmp(buffer, "rmdir ", 6) == 0) {
 
-            if (strcmp(buffer, "remove") == 0) {
-                puts_fd1("remove: missing operand\n");
+            if (strcmp(buffer, "rmdir") == 0) {
+                puts_fd1("rmdir: missing operand\n");
+                continue;
+            }
+
+            char *path = buffer + 6;
+
+            while (*path == ' ')
+                path++;
+
+            if (*path == '\0') {
+                puts_fd1("rmdir: missing operand\n");
+                continue;
+            }
+
+            long r = syscall(7, path);
+
+            if (r < 0) {
+                if (r == -ENOENT)
+                    print_error_path("rmdir: ", path,
+                                     ": no such file or directory\n");
+                else if (r == -ENOTDIR)
+                    print_error_path("rmdir: ", path,
+                                     ": not a directory\n");
+                else if (r == -EACCES)
+                    print_error_path("rmdir: ", path,
+                                     ": permission denied\n");
+                else if (r == -ENOTEMPTY)
+                    print_error_path("rmdir: ", path,
+                                     ": directory not empty\n");
+                else
+                    print_error_path("rmdir: ", path,
+                                     ": cannot remove directory\n");
+            }
+
+            continue;
+        }
+
+        /* UNLINK */
+
+        if (strcmp(buffer, "unlink") == 0 ||
+            strncmp(buffer, "unlink ", 7) == 0) {
+
+            if (strcmp(buffer, "unlink") == 0) {
+                puts_fd1("unlink: missing operand\n");
                 continue;
             }
 
@@ -698,25 +826,28 @@ int main(void)
                 path++;
 
             if (*path == '\0') {
-                puts_fd1("remove: missing operand\n");
+                puts_fd1("unlink: missing operand\n");
                 continue;
             }
 
-            long r = syscall(7, path);
+            long r = syscall(13, path);
 
             if (r < 0) {
                 if (r == -ENOENT)
-                    print_error_path("remove: ", path,
+                    print_error_path("unlink: ", path,
                                      ": no such file or directory\n");
+                else if (r == -EISDIR)
+                    print_error_path("unlink: ", path,
+                                     ": is a directory\n");
                 else if (r == -ENOTDIR)
-                    print_error_path("remove: ", path,
+                    print_error_path("unlink: ", path,
                                      ": not a directory\n");
                 else if (r == -EACCES)
-                    print_error_path("remove: ", path,
+                    print_error_path("unlink: ", path,
                                      ": permission denied\n");
                 else
-                    print_error_path("remove: ", path,
-                                     ": cannot remove\n");
+                    print_error_path("unlink: ", path,
+                                     ": cannot remove file\n");
             }
 
             continue;

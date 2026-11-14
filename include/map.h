@@ -3,15 +3,18 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "limine.h"
 
-#define PAGE_PRESENT (1 << 0)
-#define PAGE_RW      (1 << 1)
-#define PAGE_USER    (1 << 2)
-#define PAGE_PWT     (1 << 3)
-#define PAGE_PCD     (1 << 4)
-#define PAGE_NX      (1 << 63);
+#define PAGE_PRESENT (1ULL << 0)
+#define PAGE_RW      (1ULL << 1)
+#define PAGE_USER    (1ULL << 2)
+#define PAGE_PWT     (1ULL << 3)
+#define PAGE_PCD     (1ULL << 4)
+#define PAGE_NX      (1ULL << 63)
+#define PAGE_PS      (1ULL << 7)
+#define PAGE_ADDR    0x000FFFFFFFFFF000ULL
 
 extern uint64_t *pml4;
 extern uint64_t mem_from_alloc;
@@ -49,6 +52,7 @@ int map_range_generic(uint64_t *generic_pml4, uint64_t virt, uint64_t phys, uint
 int unmap_range_generic(uint64_t *generic_pml4, uint64_t virt, size_t size);
 int unmap_generic(uint64_t *user_pml4, uint64_t virt);
 uint64_t get_phys_generic(uint64_t *generic_pml4, uint64_t virt);
+bool is_mapped(uint64_t *pml4, uint64_t virt_addr);
 
 #define ALIGN_DOWN(value, align) ((value) & ~((align) - 1))
 #define ALIGN_UP(value, align)   (((value) + (align) - 1) & ~((align) - 1))

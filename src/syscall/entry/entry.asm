@@ -4,6 +4,10 @@ global syscall_entry
 extern syscall_main
 extern kernel_int_stack
 
+extern preemptive_enable
+extern preemptive_disable
+extern current
+
 syscall_entry:
     ; ------------------------------------------------------------
     ; Salva o RSP do usuário
@@ -14,7 +18,8 @@ syscall_entry:
     ; ------------------------------------------------------------
 
     mov cr2, rax
-    mov rax, [kernel_int_stack]
+    mov rax, [current]
+    mov rax, [rax + 0xA8]
     xchg rsp, rax
 
     push rax
@@ -44,32 +49,21 @@ syscall_entry:
     push rbx
     push rax
 
-    ; ------------------------------------------------------------
-    ; RSP aponta exatamente para struct user_regs
-    ; ------------------------------------------------------------
-    mov rdi, rsp
-
-    ; Guarda o endereço do frame.
-    ; RBP está salvo no próprio frame, portanto podemos usá-lo
-    ; como âncora durante a chamada C.
     mov rbp, rsp
 
-    ; ------------------------------------------------------------
-    ; SysV x86-64:
-    ; antes do CALL, RSP deve estar alinhado em 16 bytes.
-    ;
-    ; O frame possui 15 * 8 = 120 bytes.
-    ; Se a kernel stack começa alinhada, após os pushes
-    ; RSP fica desalinhado por 8 bytes.
-    ; ------------------------------------------------------------
-    sub rsp, 8
+    ; Alinha a stack para a ABI System V AMD64.
+    and rsp, -16
+
+    call preemptive_disable
+
+    ; RDI é caller-saved.
+    ; Recupera o ponteiro do frame depois da chamada anterior.
+    mov rdi, rbp
 
     call syscall_main
+    call preemptive_enable
 
-    ; Remove o padding usado para alinhamento
-    add rsp, 8
-
-    ; Recupera exatamente o endereço do frame
+    ; Recupera o frame original.
     mov rsp, rbp
 
     ; ------------------------------------------------------------
