@@ -491,6 +491,12 @@ int main(void)
             break;
         }
 
+        if (strcmp(buffer, "cls") == 0)
+        {
+            puts_fd1("Cleaning screen...");
+            clear_video();
+        }
+
         /* UNAME */
 
         if (strcmp(buffer, "uname") == 0) {
