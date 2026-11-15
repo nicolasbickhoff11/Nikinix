@@ -140,6 +140,29 @@ float float_abs(double x)
     return (x < 0) ? -x : x;
 }
 
+double cube_root(double n) // Danilo: i tried
+{
+	if (n == 0.0) return 0.0;
+	if (n < 0.0) return -cube_root(-n);
+	
+	double guess = n;
+    double epsilon = 1e-12;
+    int max_iter = 100;
+
+    for (int i = 0; i < max_iter; i++)
+	{
+        double prev_guess = guess;
+		
+        guess = (2.0 * guess + n / (guess * guess)) / 3.0;
+
+        if (float_abs(guess - prev_guess) < epsilon)
+		{
+            break;
+        }
+    }
+    return guess;
+}
+
 int sign(int x)
 {
     if (x < 0)
