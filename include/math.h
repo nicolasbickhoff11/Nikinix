@@ -21,6 +21,7 @@ int dword_xor_shift(void);
 double sine(double x);
 double cosine(double x);
 double square_root(double x);
+double cube_root(double n);
 double exp2(double x);
 float float_abs(double x);
 int sign(int x);
