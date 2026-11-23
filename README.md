@@ -24,6 +24,7 @@ Nikinix is a feature-rich hobby OS in progress, they have some bugs and failures
 - CMOS functions ✅
 - MSR ✅
 - IDT ✅
+- Crash display ✅
 - syscalls ✅
 - list dirs ✅
 - unix-style errno ✅
