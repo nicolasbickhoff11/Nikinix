@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include "print.h"
+#include "panic.h"
 
 void panic_screen(const char* error)
 {
