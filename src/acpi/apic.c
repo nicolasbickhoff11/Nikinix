@@ -10,6 +10,9 @@ uint64_t lapic_address = 0;
 uint32_t *io_apic_virt = 0;
 uint32_t *lapic_virt = 0;
 
+int seconds = 0;
+int ticks = 0;
+
 int gsi_keyboard_ps2 = 1;
 int irq1_polarity = 0;
 int irq1_trigger = 0;
@@ -113,5 +116,15 @@ void read_madt_entries() {
         }
 
         p += h->record_length;
+    }
+}
+
+void sleep(int seconds) // this part was coded by DaniloSenseiPlus
+{
+    int start_tick = ticks;
+
+    while (ticks < start_tick + (start_tick * (seconds * 10)))
+    {
+        // nothing here, only waits
     }
 }
