@@ -36,6 +36,51 @@ int dword_xor_shift(void)
   	return xs;
 }
 
+double exp(double x)
+{
+	if (x > 709.0)
+	{
+        return 1.0 / 0.0;
+    }
+	
+    if (x < -709.0)
+	{
+        return 0.0;
+    }
+
+    int n = (int)x;
+    double f = x - n;
+
+    double e_pow_n = 1.0;
+	
+    if (n > 0)
+	{
+        for (int i = 0; i < n; i++)
+		{
+            e_pow_n *= E_CONST;
+        }
+    }
+	
+	else if (n < 0)
+	{
+        for (int i = 0; i < -n; i++)
+		{
+            e_pow_n /= E_CONST;
+        }
+    }
+
+    double term = 1.0;
+    double e_pow_f = 1.0;
+	
+    for (int i = 1; i <= 20; i++)
+	{
+        term *= f / i;
+        e_pow_f += term;
+    }
+
+    return e_pow_n * e_pow_f;
+}
+
 double sine(double x)
 {
     double sum = 0.0;
@@ -196,11 +241,11 @@ double inverted_tangent(double x)
     {
         if (x > 0) 
         {
-            return PI / 2 - atan(1 / x);
+            return PI / 2 - inverted_tangent(1 / x); // fixed more problem
         } 
         else 
         {
-            return -PI / 2 - atan(1 / x);
+            return -PI / 2 - inverted_tangent(1 / x);
         }
     }
 
@@ -227,7 +272,7 @@ double inverted_tangent2(double y, double x)
         return 0;
     }
 
-    double atanResult = atan(y / x);
+    double atanResult = inverted_tangent(y / x); // fixed a problem
 
     if (x > 0) 
     {
@@ -268,4 +313,30 @@ double pow(double base, int exp)
     }
     
     return result;
+}
+
+double log(double x)
+{
+    if (x <= 0.0) // Error: log(x) is not defined to x <= 0.\
+	{
+		return;
+    }
+
+    double guess = x - 1.0;
+    double tolerance = 1e-12;
+    int max_iter = 100;
+
+    for (int i = 0; i < max_iter; i++)
+	{
+        double e_guess = exp(guess);
+        double diff = e_guess - x;
+        guess -= diff / e_guess;
+
+        if (fabs(diff) < tolerance)
+		{
+            break;
+        }
+    }
+
+    return guess;
 }
