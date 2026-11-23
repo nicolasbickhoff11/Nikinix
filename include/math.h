@@ -8,6 +8,7 @@ typedef struct
 #define PI 3.141592f
 #define RANDMAX 32767
 #define SUMLIM 50
+#define E_CONST 2.718281828459045
 
 #define abs(a) (((a) > 0) ? a : -(a))
 
@@ -18,6 +19,7 @@ unsigned long xor_seed(unsigned long seed);
 inline void reflect_2D(int* x, int* y, int w, int h);
 int xor_shift(void);
 int dword_xor_shift(void);
+double exp(double x);
 double sine(double x);
 double cosine(double x);
 double square_root(double x);
@@ -29,3 +31,4 @@ int floor(double x);
 double inverted_tangent(double x);
 double inverted_tangent2(double y, double x);
 double pow(double base, int exp);
+double log(double x);
