@@ -425,32 +425,18 @@ static void command_cat(const char *path)
         puts_fd1("cat: close error\n");
 }
 
-/* SHELL */
+struct utsname uts = {0};
 
-int main(void)
+/* CLS COMMAND */
+static void create_shell(char path)
 {
-    puts_fd1("Hello World C!\n");
-    puts_fd1("BASIC SHELL!\n");
+    puts_fd1("root@");
+    puts_fd1(uts.nodename);
+    puts_fd1(":");
+    puts_fd1(path);
+    puts_fd1("# ");
 
-    dirent_t entries[64];
-
-    for (;;) {
-        char buffer[256] = {0};
-        struct utsname uts = {0};
-
-        syscall(3, &uts);
-
-        char path[256] = {0};
-
-        syscall(9, path, sizeof(path));
-
-        puts_fd1("root@");
-        puts_fd1(uts.nodename);
-        puts_fd1(":");
-        puts_fd1(path);
-        puts_fd1("# ");
-
-        long i = syscall(1, 0, buffer, sizeof(buffer) - 1);
+    long i = syscall(1, 0, buffer, sizeof(buffer) - 1);
 
         if (i == -EINTR)
             continue;
@@ -483,6 +469,26 @@ int main(void)
 
         if (buffer[0] == '\0')
             continue;
+}
+
+/* SHELL */
+int main(void)
+{
+    puts_fd1("Hello World C!\n");
+    puts_fd1("BASIC SHELL!\n");
+
+    dirent_t entries[64];
+
+    for (;;) {
+        char buffer[256] = {0};
+        
+        syscall(3, &uts);
+
+        char path[256] = {0};
+
+        syscall(9, path, sizeof(path));
+
+        create_shell(path);
 
         /* EXIT */
 
@@ -491,10 +497,11 @@ int main(void)
             break;
         }
 
+        /* CLS */
         if (strcmp(buffer, "cls") == 0)
         {
             puts_fd1("Cleaning screen...");
-            clear_video();
+            create_shell(path);
         }
 
         /* UNAME */
@@ -881,6 +888,25 @@ int main(void)
 
             command_cat(path);
             continue;
+        }
+
+        /* HELP */
+        if (strcmp(buffer, "help") == 0 || strncmp(buffer, "help", 7) == 0)
+        {
+            puts_fd1("All commands:\n");
+            puts_fd1("help: Show this message\n");
+            puts_fd1("cls: Clear screen\n");
+            puts_fd1("exit: Exit Nikinix shell\n");
+            puts_fd1("uname: Shows computer name and system specs\n");
+            puts_fd1("forktest: Test fork system\n");
+            puts_fd1("pwd: Show system directory");
+            puts_fd1("cd: Changes current directory\n");
+            puts_fd1("ls: Show all files and directories in computer\n");
+            puts_fd1("mkdir: Make a folder\n");
+            puts_fd1("create: Create a file\n");
+            puts_fd1("rmdir: Rename a folder\n");
+            puts_fd1("unlink: Remove a file of a folder\n");
+            puts_fd1("cat: Read file content\n");
         }
 
         /* COMMAND NOT FOUND */
